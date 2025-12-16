@@ -1,0 +1,1126 @@
+CREATE TABLE IF NOT EXISTS "Companies" (
+      "Id" SERIAL PRIMARY KEY,
+      "CompanyName" VARCHAR(255) NOT NULL,
+      "BusinessType" VARCHAR(100),
+      "GstNumber" VARCHAR(100),
+      "Address" TEXT,
+      "City" VARCHAR(100),
+      "State" VARCHAR(100),
+      "Country" VARCHAR(100),
+      "PostalCode" VARCHAR(20),
+      "Website" VARCHAR(255),
+      "OwnerName" VARCHAR(255),
+      "LogoUrl" VARCHAR(255),
+      "IsActive" BOOLEAN DEFAULT TRUE,
+      "Flag" BOOLEAN DEFAULT TRUE,
+      "IsDelete" BOOLEAN DEFAULT FALSE,
+      "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+CREATE TABLE IF NOT EXISTS "Users" (
+      "UserId" SERIAL PRIMARY KEY,
+      "Name" VARCHAR(255) NOT NULL,
+      "Email" VARCHAR(255) NOT NULL UNIQUE,
+      "Password" VARCHAR(255) NOT NULL,
+      "MobileNumber" VARCHAR(15),
+      "CompanyId" INT REFERENCES "Companies"("Id") ON DELETE CASCADE,
+      "UserTypeId" INT REFERENCES "UserTypes"("Id") ON DELETE CASCADE,
+      "CreatedBy" INT REFERENCES "Users"("UserId"),
+      "Address" TEXT,
+      "City" VARCHAR(100),
+      "State" VARCHAR(100),
+      "Country" VARCHAR(100),
+      "PostalCode" VARCHAR(20),
+      "userImage" TEXT,
+      "IsActive" BOOLEAN DEFAULT TRUE,
+      "Flag" BOOLEAN DEFAULT TRUE,
+      "IsDelete" BOOLEAN DEFAULT FALSE,
+      "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+
+  CREATE TABLE IF NOT EXISTS "UserTypes" (
+      "Id" SERIAL PRIMARY KEY,
+      "UserType" VARCHAR(50) NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS "refresh_tokens" (
+      "Id" SERIAL PRIMARY KEY,
+      "UserId" INT REFERENCES "Users"("UserId"),
+      "Token" TEXT NOT NULL,
+      "ExpiresAt" TIMESTAMP NOT NULL,
+      "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      "Revoked" BOOLEAN DEFAULT FALSE
+    );
+
+
+CREATE TABLE IF NOT EXISTS "ProductCategories" (
+  "Id" SERIAL PRIMARY KEY,
+  "CategoryName" VARCHAR(100) NOT NULL,
+  "Description" TEXT,
+  "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE IF NOT EXISTS "Units" (
+  "Id" SERIAL PRIMARY KEY,
+  "Name" VARCHAR(50) NOT NULL,
+  "Symbol" VARCHAR(10)
+);
+
+
+CREATE TABLE IF NOT EXISTS "Products" (
+  "Id" SERIAL PRIMARY KEY,
+  "ProductName" VARCHAR(255) NOT NULL,
+  "ProductCode" VARCHAR(100) UNIQUE,
+  "Description" TEXT,
+  "CategoryId" INT REFERENCES "ProductCategories"("Id") ON DELETE SET NULL,
+  "UnitId" INT REFERENCES "Units"("Id"),
+  "Price" NUMERIC(10,2),
+  "Cost" NUMERIC(10,2),
+  "StockQuantity" INT DEFAULT 0,
+  "ReorderLevel" INT DEFAULT 0,
+  "NotifyStockOut" BOOLEAN DEFAULT TRUE,
+  "NotifyStockReload" BOOLEAN DEFAULT TRUE,
+  "CompanyId" INT REFERENCES "Companies"("Id") ON DELETE CASCADE,
+  "CreatedBy" INT REFERENCES "Users"("UserId"),
+  "IsActive" BOOLEAN DEFAULT TRUE,
+  "Flag" BOOLEAN DEFAULT TRUE,
+  "IsDelete" BOOLEAN DEFAULT FALSE,
+  "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "Warehouses" (
+  "Id" SERIAL PRIMARY KEY,
+  "Name" VARCHAR(255) NOT NULL,
+  "Location" TEXT,
+  "ManagerId" INT REFERENCES "Users"("UserId"),
+  "CompanyId" INT REFERENCES "Companies"("Id"),
+  "IsActive" BOOLEAN DEFAULT TRUE,
+  "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE IF NOT EXISTS "ProductStockPerWarehouse" (
+  "Id" SERIAL PRIMARY KEY,
+  "ProductId" INT REFERENCES "Products"("Id") ON DELETE CASCADE,
+  "WarehouseId" INT REFERENCES "Warehouses"("Id") ON DELETE CASCADE,
+  "Quantity" INT DEFAULT 0,
+  UNIQUE ("ProductId", "WarehouseId")
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "StockMovements" (
+  "Id" SERIAL PRIMARY KEY,
+  "ProductId" INT REFERENCES "Products"("Id"),
+  "WarehouseId" INT REFERENCES "Warehouses"("Id"),
+  "ChangeType" VARCHAR(50), -- IN, OUT, ADJUSTMENT
+  "Quantity" INT NOT NULL,
+  "Reason" TEXT,
+  "CreatedBy" INT REFERENCES "Users"("UserId"),
+  "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "Suppliers" (
+  "Id" SERIAL PRIMARY KEY,
+  "Name" VARCHAR(255) NOT NULL,
+  "ContactPerson" VARCHAR(255),
+  "Email" VARCHAR(255),
+  "Phone" VARCHAR(20),
+  "Address" TEXT,
+  "City" VARCHAR(100),
+  "State" VARCHAR(100),
+  "Country" VARCHAR(100),
+  "PostalCode" VARCHAR(20),
+  "IsActive" BOOLEAN DEFAULT TRUE,
+  "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "PurchaseOrders" (
+  "Id" SERIAL PRIMARY KEY,
+  "SupplierId" INT REFERENCES "Suppliers"("Id"),
+  "OrderDate" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "ReceivedDate" TIMESTAMP,
+  "Status" VARCHAR(50) DEFAULT 'Pending',
+  "CompanyId" INT REFERENCES "Companies"("Id"),
+  "CreatedBy" INT REFERENCES "Users"("UserId")
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "PurchaseOrderItems" (
+  "Id" SERIAL PRIMARY KEY,
+  "PurchaseOrderId" INT REFERENCES "PurchaseOrders"("Id") ON DELETE CASCADE,
+  "ProductId" INT REFERENCES "Products"("Id"),
+  "Quantity" INT NOT NULL,
+  "UnitCost" NUMERIC(10, 2)
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "Customers" (
+  "Id" SERIAL PRIMARY KEY,
+  "Name" VARCHAR(255) NOT NULL,
+  "Email" VARCHAR(255),
+  "Phone" VARCHAR(20),
+  "Address" TEXT,
+  "City" VARCHAR(100),
+  "State" VARCHAR(100),
+  "Country" VARCHAR(100),
+  "PostalCode" VARCHAR(20),
+  "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "SalesOrders" (
+  "Id" SERIAL PRIMARY KEY,
+  "CustomerId" INT REFERENCES "Customers"("Id"),
+  "OrderDate" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "Status" VARCHAR(50) DEFAULT 'Pending',
+  "CompanyId" INT REFERENCES "Companies"("Id"),
+  "CreatedBy" INT REFERENCES "Users"("UserId")
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "SalesOrderItems" (
+  "Id" SERIAL PRIMARY KEY,
+  "SalesOrderId" INT REFERENCES "SalesOrders"("Id") ON DELETE CASCADE,
+  "ProductId" INT REFERENCES "Products"("Id"),
+  "Quantity" INT NOT NULL,
+  "UnitPrice" NUMERIC(10, 2)
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "Taxes" (
+  "Id" SERIAL PRIMARY KEY,
+  "Name" VARCHAR(100),
+  "Rate" NUMERIC(5, 2),
+  "Description" TEXT
+);
+
+
+
+
+CREATE TABLE IF NOT EXISTS "ProductTaxMap" (
+  "Id" SERIAL PRIMARY KEY,
+  "ProductId" INT REFERENCES "Products"("Id"),
+  "TaxId" INT REFERENCES "Taxes"("Id")
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "AuditLogs" (
+  "Id" SERIAL PRIMARY KEY,
+  "TableName" VARCHAR(100),
+  "RecordId" INT,
+  "Action" VARCHAR(20),
+  "ChangedBy" INT REFERENCES "Users"("UserId"),
+  "ChangeTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  "Changes" JSONB
+);
+
+
+
+CREATE TABLE IF NOT EXISTS "ProfitLossReports" (
+  "Id" SERIAL PRIMARY KEY,
+  "CompanyId" INT REFERENCES "Companies"("Id"),
+  "ReportDate" DATE NOT NULL,        -- Date for which report is generated
+  "TotalSales" NUMERIC(15, 2) NOT NULL DEFAULT 0,
+  "TotalCost" NUMERIC(15, 2) NOT NULL DEFAULT 0,
+  "GrossProfit" NUMERIC(15, 2) NOT NULL DEFAULT 0,
+  "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+================================================================================
+-- =========================
+-- Companies Table
+-- =========================
+CREATE TABLE Companies (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    createdAt TIMESTAMP DEFAULT NOW(),
+    updatedAt TIMESTAMP DEFAULT NOW(),
+    isActive BOOLEAN DEFAULT TRUE,
+    isDeleted BOOLEAN DEFAULT FALSE,
+    flag BOOLEAN DEFAULT TRUE
+);
+
+-- =========================
+-- Roles Table
+-- =========================
+CREATE TABLE Roles (
+    id SERIAL PRIMARY KEY,
+    roleName VARCHAR(100) UNIQUE NOT NULL,   -- Owner, Manager, TeamLead, Employee
+    permissions JSONB,                       -- Optional, store CRUD permissions
+    createdAt TIMESTAMP DEFAULT NOW(),
+    updatedAt TIMESTAMP DEFAULT NOW(),
+    isActive BOOLEAN DEFAULT TRUE,
+    isDeleted BOOLEAN DEFAULT FALSE,
+    flag BOOLEAN DEFAULT TRUE
+);
+
+-- =========================
+-- Users Table
+-- =========================
+CREATE TABLE Users (
+    id SERIAL PRIMARY KEY,
+    company_id INT REFERENCES Companies(id) ON DELETE CASCADE,
+    role_id INT REFERENCES Roles(id),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    createdAt TIMESTAMP DEFAULT NOW(),
+    updatedAt TIMESTAMP DEFAULT NOW(),
+    isActive BOOLEAN DEFAULT TRUE,
+    isDeleted BOOLEAN DEFAULT FALSE,
+    flag BOOLEAN DEFAULT TRUE
+);
+
+-- =========================
+-- Master Tables (Dropdown Data)
+-- =========================
+CREATE TABLE LeadSources (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE ProductCategories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE FollowupTypes (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE Industries (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE SalesStages (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL
+);
+
+-- Presales Task Types
+CREATE TABLE TaskTypes (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,   -- e.g., Demo, PoC, Workshop
+    defaultDurationMinutes INT,          -- Expected hours/minutes
+    createdAt TIMESTAMP DEFAULT NOW()
+);
+
+-- =========================
+-- Accounts (like Dynamics 365)
+-- =========================
+CREATE TABLE Accounts (
+    id SERIAL PRIMARY KEY,
+    company_id INT REFERENCES Companies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    website VARCHAR(255),
+    description TEXT,
+    industry_id INT REFERENCES Industries(id),
+    createdBy INT REFERENCES Users(id),
+    createdAt TIMESTAMP DEFAULT NOW(),
+    updatedAt TIMESTAMP DEFAULT NOW(),
+    isActive BOOLEAN DEFAULT TRUE,
+    isDeleted BOOLEAN DEFAULT FALSE,
+    flag BOOLEAN DEFAULT TRUE
+);
+
+-- =========================
+-- Contacts (like Dynamics 365)
+-- =========================
+CREATE TABLE Contacts (
+    id SERIAL PRIMARY KEY,
+    company_id INT REFERENCES Companies(id) ON DELETE CASCADE,
+    account_id INT REFERENCES Accounts(id) ON DELETE SET NULL,
+    firstName VARCHAR(100),
+    middleName VARCHAR(100),
+    lastName VARCHAR(100),
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    altPhone VARCHAR(50),
+    linkedinUrl VARCHAR(500),
+    title VARCHAR(255),
+    createdBy INT REFERENCES Users(id),
+    createdAt TIMESTAMP DEFAULT NOW(),
+    updatedAt TIMESTAMP DEFAULT NOW(),
+    isActive BOOLEAN DEFAULT TRUE,
+    isDeleted BOOLEAN DEFAULT FALSE,
+    flag BOOLEAN DEFAULT TRUE
+);
+
+-- =========================
+-- Leads Table
+-- =========================
+CREATE TABLE Leads (
+    id SERIAL PRIMARY KEY,
+    company_id INT REFERENCES Companies(id) ON DELETE CASCADE,
+    account_id INT REFERENCES Accounts(id) ON DELETE SET NULL,
+    contact_id INT REFERENCES Contacts(id) ON DELETE SET NULL,
+    leadSource_id INT REFERENCES LeadSources(id),
+    productCategory_id INT REFERENCES ProductCategories(id),
+    followupType_id INT REFERENCES FollowupTypes(id),
+    industry_id INT REFERENCES Industries(id),
+    status VARCHAR(50) DEFAULT 'New',   -- New, In Progress, Won, Lost
+    rating INT,
+    description TEXT,
+    comments TEXT,
+    assignedTo INT REFERENCES Users(id),
+    assignedFrom INT REFERENCES Users(id),
+    createdBy INT REFERENCES Users(id),
+    createdAt TIMESTAMP DEFAULT NOW(),
+    updatedAt TIMESTAMP DEFAULT NOW(),
+    isActive BOOLEAN DEFAULT TRUE,
+    isDeleted BOOLEAN DEFAULT FALSE,
+    flag BOOLEAN DEFAULT TRUE
+);
+
+-- =========================
+-- Opportunities Table
+-- =========================
+CREATE TABLE Opportunities (
+    id SERIAL PRIMARY KEY,
+    company_id INT REFERENCES Companies(id) ON DELETE CASCADE,
+    account_id INT REFERENCES Accounts(id) ON DELETE SET NULL,
+    contact_id INT REFERENCES Contacts(id) ON DELETE SET NULL,
+    opportunityName VARCHAR(255) NOT NULL,
+    salesStage_id INT REFERENCES SalesStages(id),
+    leadSource_id INT REFERENCES LeadSources(id),
+    productCategory_id INT REFERENCES ProductCategories(id),
+    industry_id INT REFERENCES Industries(id),
+    budgetAmount NUMERIC(15,2),
+    estCloseDate DATE,
+    description TEXT,
+    qualificationComments TEXT,
+    detailedSummary TEXT,
+    assignedTo INT REFERENCES Users(id),
+    assignedFrom INT REFERENCES Users(id),
+    createdBy INT REFERENCES Users(id),
+    createdAt TIMESTAMP DEFAULT NOW(),
+    updatedAt TIMESTAMP DEFAULT NOW(),
+    isActive BOOLEAN DEFAULT TRUE,
+    isDeleted BOOLEAN DEFAULT FALSE,
+    flag BOOLEAN DEFAULT TRUE
+);
+
+-- =========================
+-- Presales Table
+-- =========================
+CREATE TABLE Presales (
+    id SERIAL PRIMARY KEY,
+    company_id INT REFERENCES Companies(id) ON DELETE CASCADE,
+    
+    -- Relation
+    lead_id INT REFERENCES Leads(id) ON DELETE SET NULL,
+    opportunity_id INT REFERENCES Opportunities(id) ON DELETE SET NULL,
+
+    clientName VARCHAR(255),                  -- Overview → Client Name
+    relatedTo VARCHAR(255),                   -- Related To (free text or account reference)
+    
+    startDate TIMESTAMP,
+    endDate TIMESTAMP,
+    eta TIMESTAMP,                            -- Expected completion
+    durationMinutes INT,                      -- Duration (Minutes)
+    status VARCHAR(50) DEFAULT 'Pending',     -- Status: Pending, In Progress, Completed, Cancelled
+    
+    hyperscaler VARCHAR(100),                 -- e.g., AWS, Azure, GCP
+    follow_up_trigger_status VARCHAR(50),     -- Pending / Triggered / Done
+
+    taskType_id INT REFERENCES TaskTypes(id), -- Master table (task types with default hours)
+    
+    documents TEXT[],                         -- Store file URLs or paths
+
+    detailedSummary TEXT,                     -- Detailed Summary
+    description TEXT,                         -- Description/History
+    comments TEXT,                            -- Quick inline comments (latest)
+
+    assignedTo INT REFERENCES Users(id),      -- Current assignment
+    assignedFrom INT REFERENCES Users(id),    -- Who assigned it
+    createdBy INT REFERENCES Users(id),       -- Creator
+
+    createdAt TIMESTAMP DEFAULT NOW(),
+    updatedAt TIMESTAMP DEFAULT NOW(),
+    isActive BOOLEAN DEFAULT TRUE,
+    isDeleted BOOLEAN DEFAULT FALSE,
+    flag BOOLEAN DEFAULT TRUE
+);
+
+-- Presales Comments
+CREATE TABLE PresalesComments (
+    id SERIAL PRIMARY KEY,
+    presales_id INT REFERENCES Presales(id) ON DELETE CASCADE,
+    comment_text TEXT NOT NULL,
+    commentedBy INT REFERENCES Users(id),
+    createdAt TIMESTAMP DEFAULT NOW()
+);
+
+-- Presales Assignments
+CREATE TABLE PresalesAssignments (
+    id SERIAL PRIMARY KEY,
+    presales_id INT REFERENCES Presales(id) ON DELETE CASCADE,
+    assignedTo INT REFERENCES Users(id),
+    assignedFrom INT REFERENCES Users(id),
+    changedBy INT REFERENCES Users(id),
+    changedAt TIMESTAMP DEFAULT NOW()
+);
+
+-- Presales Audit Logs
+CREATE TABLE PresalesAuditLogs (
+    id SERIAL PRIMARY KEY,
+    presales_id INT REFERENCES Presales(id) ON DELETE CASCADE,
+    changedBy INT REFERENCES Users(id),
+    oldValue JSONB,
+    newValue JSONB,
+    changedAt TIMESTAMP DEFAULT NOW()
+);
+
+-- =========================
+-- Addresses (multiple per Lead/Opportunity/Account/Contact)
+-- =========================
+CREATE TABLE Addresses (
+    id SERIAL PRIMARY KEY,
+    entityType VARCHAR(50) NOT NULL,   -- 'Lead' | 'Opportunity' | 'Account' | 'Contact'
+    entityId INT NOT NULL,
+    street VARCHAR(255),
+    city VARCHAR(100),
+    state VARCHAR(100),
+    region VARCHAR(100),
+    postalCode VARCHAR(20),
+    country VARCHAR(100),
+    createdAt TIMESTAMP DEFAULT NOW()
+);
+
+-- =========================
+-- Groups (for sharing multiple users)
+-- =========================
+CREATE TABLE Groups (
+    id SERIAL PRIMARY KEY,
+    company_id INT REFERENCES Companies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    createdBy INT REFERENCES Users(id),
+    createdAt TIMESTAMP DEFAULT NOW(),
+    updatedAt TIMESTAMP DEFAULT NOW()
+);
+
+-- =========================
+-- Group Members
+-- =========================
+CREATE TABLE GroupMembers (
+    id SERIAL PRIMARY KEY,
+    group_id INT REFERENCES Groups(id) ON DELETE CASCADE,
+    user_id INT REFERENCES Users(id) ON DELETE CASCADE,
+    addedAt TIMESTAMP DEFAULT NOW()
+);
+
+-- =========================
+-- Entity Visibility (sharing rules)
+-- =========================
+CREATE TABLE EntityVisibility (
+    id SERIAL PRIMARY KEY,
+    entityType VARCHAR(50) NOT NULL,   -- Lead, Opportunity, Account, Contact, Presales
+    entityId INT NOT NULL,
+    visibilityType VARCHAR(50) NOT NULL DEFAULT 'Private',  
+    -- Options: 'Private', 'Organization', 'User', 'Group'
+
+    user_id INT REFERENCES Users(id) ON DELETE CASCADE,    -- when visibilityType = 'User'
+    group_id INT REFERENCES Groups(id) ON DELETE CASCADE,  -- when visibilityType = 'Group'
+
+    createdAt TIMESTAMP DEFAULT NOW()
+);
+
+-- =========================
+-- Comments (History of Notes)
+-- =========================
+CREATE TABLE Comments (
+    id SERIAL PRIMARY KEY,
+    entityType VARCHAR(50) NOT NULL,   -- Lead, Opportunity, Account, Contact
+    entityId INT NOT NULL,
+    comment_text TEXT NOT NULL,
+    commentedBy INT REFERENCES Users(id),
+    createdAt TIMESTAMP DEFAULT NOW()
+);
+
+-- =========================
+-- Assignments (Assign-To / Assign-From History)
+-- =========================
+CREATE TABLE Assignments (
+    id SERIAL PRIMARY KEY,
+    entityType VARCHAR(50) NOT NULL,  -- Lead, Opportunity, Account, Contact
+    entityId INT NOT NULL,
+    assignedTo INT REFERENCES Users(id),
+    assignedFrom INT REFERENCES Users(id),
+    changedBy INT REFERENCES Users(id),
+    changedAt TIMESTAMP DEFAULT NOW()
+);
+
+-- =========================
+-- Audit Logs (Track Any Changes)
+-- =========================
+CREATE TABLE AuditLogs (
+    id SERIAL PRIMARY KEY,
+    entityType VARCHAR(100) NOT NULL,   -- e.g. 'Lead', 'User', 'Comment'
+    entityId INT NOT NULL,
+    changedBy INT REFERENCES Users(id),
+    oldValue JSONB,
+    newValue JSONB,
+    changedAt TIMESTAMP DEFAULT NOW()
+);
+
+-- =========================
+-- Tokens (For Authentication / Refresh Token Storage)
+-- =========================
+CREATE TABLE Tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(id) ON DELETE CASCADE,
+    refresh_token TEXT NOT NULL,
+    createdAt TIMESTAMP DEFAULT NOW(),
+    expiresAt TIMESTAMP NOT NULL
+);
+
+
+
+====x==x==x==x==x==x==x==x==x==x==x==x==x==x==x==x==x==x==x==x==x==x==x==x=x==x=x=x==x==x=x=x==x=x=====
+
+-- =========================
+-- Companies Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "Companies" (
+    "Id" SERIAL PRIMARY KEY,
+    "CompanyName" VARCHAR(255) NOT NULL,
+    "BusinessType" VARCHAR(100),
+    "GstNumber" VARCHAR(100),
+    "Address" TEXT,
+    "City" VARCHAR(100),
+    "State" VARCHAR(100),
+    "Country" VARCHAR(100),
+    "PostalCode" VARCHAR(20),
+    "Website" VARCHAR(255),
+    "OwnerName" VARCHAR(255),
+    "LogoUrl" VARCHAR(255),
+    "IsActive" BOOLEAN DEFAULT TRUE,
+    "Flag" BOOLEAN DEFAULT TRUE,
+    "IsDeleted" BOOLEAN DEFAULT FALSE,
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "CreatedBy" INT REFERENCES "Users"("UserId"),
+    "UpdatedBy" INT REFERENCES "Users"("UserId")
+);
+
+-- =========================
+-- Users Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "Users" (
+    "UserId" SERIAL PRIMARY KEY,
+    "CompanyId" INT REFERENCES "Companies"("Id") ON DELETE CASCADE,
+    "RoleId" INT REFERENCES "Roles"("Id"),
+    "Name" VARCHAR(255) NOT NULL,
+    "Email" VARCHAR(255) NOT NULL UNIQUE,
+    "Password" VARCHAR(255) NOT NULL,
+    "MobileNumber" VARCHAR(15),
+    "Address" TEXT,
+    "City" VARCHAR(100),
+    "State" VARCHAR(100),
+    "Country" VARCHAR(100),
+    "PostalCode" VARCHAR(20),
+    "UserImage" TEXT,
+    "IsActive" BOOLEAN DEFAULT TRUE,
+    "Flag" BOOLEAN DEFAULT TRUE,
+    "IsDeleted" BOOLEAN DEFAULT FALSE,
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "CreatedBy" INT REFERENCES "Users"("UserId"),
+    "UpdatedBy" INT REFERENCES "Users"("UserId")
+);
+
+-- =========================
+-- Roles Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "Roles" (
+    "Id" SERIAL PRIMARY KEY,
+    "RoleName" VARCHAR(100) UNIQUE NOT NULL, 
+    "Permissions" JSONB, 
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "IsActive" BOOLEAN DEFAULT TRUE,
+    "IsDeleted" BOOLEAN DEFAULT FALSE,
+    "Flag" BOOLEAN DEFAULT TRUE
+);
+
+-- =========================
+-- Product Categories Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "ProductCategories" (
+    "Id" SERIAL PRIMARY KEY,
+    "CategoryName" VARCHAR(255) NOT NULL,
+    "Description" TEXT,
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "IsActive" BOOLEAN DEFAULT TRUE,
+    "IsDeleted" BOOLEAN DEFAULT FALSE
+);
+
+-- =========================
+-- Products Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "Products" (
+    "Id" SERIAL PRIMARY KEY,
+    "ProductName" VARCHAR(255) NOT NULL,
+    "ProductCode" VARCHAR(100) UNIQUE,
+    "Description" TEXT,
+    "CategoryId" INT REFERENCES "ProductCategories"("Id") ON DELETE SET NULL,
+    "Price" NUMERIC(10,2),
+    "Cost" NUMERIC(10,2),
+    "StockQuantity" INT DEFAULT 0,
+    "ReorderLevel" INT DEFAULT 0,
+    "NotifyStockOut" BOOLEAN DEFAULT TRUE,
+    "NotifyStockReload" BOOLEAN DEFAULT TRUE,
+    "CompanyId" INT REFERENCES "Companies"("Id") ON DELETE CASCADE,
+    "CreatedBy" INT REFERENCES "Users"("UserId"),
+    "IsActive" BOOLEAN DEFAULT TRUE,
+    "Flag" BOOLEAN DEFAULT TRUE,
+    "IsDeleted" BOOLEAN DEFAULT FALSE,
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Warehouses Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "Warehouses" (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(255) NOT NULL,
+    "Location" TEXT,
+    "ManagerId" INT REFERENCES "Users"("UserId"),
+    "CompanyId" INT REFERENCES "Companies"("Id"),
+    "IsActive" BOOLEAN DEFAULT TRUE,
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Product Stock Per Warehouse Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "ProductStockPerWarehouse" (
+    "Id" SERIAL PRIMARY KEY,
+    "ProductId" INT REFERENCES "Products"("Id") ON DELETE CASCADE,
+    "WarehouseId" INT REFERENCES "Warehouses"("Id") ON DELETE CASCADE,
+    "Quantity" INT DEFAULT 0,
+    UNIQUE ("ProductId", "WarehouseId")
+);
+
+-- =========================
+-- Stock Movements Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "StockMovements" (
+    "Id" SERIAL PRIMARY KEY,
+    "ProductId" INT REFERENCES "Products"("Id"),
+    "WarehouseId" INT REFERENCES "Warehouses"("Id"),
+    "ChangeType" VARCHAR(50), -- IN, OUT, ADJUSTMENT
+    "Quantity" INT NOT NULL,
+    "Reason" TEXT,
+    "CreatedBy" INT REFERENCES "Users"("UserId"),
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Suppliers Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "Suppliers" (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(255) NOT NULL,
+    "ContactPerson" VARCHAR(255),
+    "Email" VARCHAR(255),
+    "Phone" VARCHAR(20),
+    "Address" TEXT,
+    "City" VARCHAR(100),
+    "State" VARCHAR(100),
+    "Country" VARCHAR(100),
+    "PostalCode" VARCHAR(20),
+    "IsActive" BOOLEAN DEFAULT TRUE,
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Purchase Orders Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "PurchaseOrders" (
+    "Id" SERIAL PRIMARY KEY,
+    "SupplierId" INT REFERENCES "Suppliers"("Id"),
+    "OrderDate" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "ReceivedDate" TIMESTAMP,
+    "Status" VARCHAR(50) DEFAULT 'Pending',
+    "CompanyId" INT REFERENCES "Companies"("Id"),
+    "CreatedBy" INT REFERENCES "Users"("UserId"),
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Purchase Order Items Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "PurchaseOrderItems" (
+    "Id" SERIAL PRIMARY KEY,
+    "PurchaseOrderId" INT REFERENCES "PurchaseOrders"("Id") ON DELETE CASCADE,
+    "ProductId" INT REFERENCES "Products"("Id"),
+    "Quantity" INT NOT NULL,
+    "UnitCost" NUMERIC(10, 2),
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Sales Orders Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "SalesOrders" (
+    "Id" SERIAL PRIMARY KEY,
+    "CustomerId" INT REFERENCES "Customers"("Id"),
+    "OrderDate" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "Status" VARCHAR(50) DEFAULT 'Pending',
+    "CompanyId" INT REFERENCES "Companies"("Id"),
+    "CreatedBy" INT REFERENCES "Users"("UserId"),
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Sales Order Items Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "SalesOrderItems" (
+    "Id" SERIAL PRIMARY KEY,
+    "SalesOrderId" INT REFERENCES "SalesOrders"("Id") ON DELETE CASCADE,
+    "ProductId" INT REFERENCES "Products"("Id"),
+    "Quantity" INT NOT NULL,
+    "UnitPrice" NUMERIC(10, 2),
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Customers Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "Customers" (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(255) NOT NULL,
+    "Email" VARCHAR(255),
+    "Phone" VARCHAR(20),
+    "Address" TEXT,
+    "City" VARCHAR(100),
+    "State" VARCHAR(100),
+    "Country" VARCHAR(100),
+    "PostalCode" VARCHAR(20),
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Audit Logs Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "AuditLogs" (
+    "Id" SERIAL PRIMARY KEY,
+    "TableName" VARCHAR(100),
+    "RecordId" INT,
+    "Action" VARCHAR(20),
+    "ChangedBy" INT REFERENCES "Users"("UserId"),
+    "ChangeTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "Changes" JSONB,
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Lead Sources Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "LeadSources" (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(255) UNIQUE NOT NULL
+);
+
+-- =========================
+-- Followup Types Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "FollowupTypes" (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(255) UNIQUE NOT NULL
+);
+
+-- =========================
+-- Industries Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "Industries" (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(255) UNIQUE NOT NULL
+);
+
+-- =========================
+-- Sales Stages Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "SalesStages" (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(255) UNIQUE NOT NULL
+);
+
+-- =========================
+-- Task Types Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "TaskTypes" (
+    "Id" SERIAL PRIMARY KEY,
+    "Name" VARCHAR(100) UNIQUE NOT NULL,
+    "DefaultDurationMinutes" INT, 
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================
+-- Accounts Table
+-- =========================
+CREATE TABLE IF NOT EXISTS "Accounts" (
+    "Id" SERIAL PRIMARY KEY,
+    "CompanyId" INT REFERENCES "Companies"("Id") ON DELETE CASCADE,
+    "Name" VARCHAR(255) NOT NULL,
+    "Website" VARCHAR(255),
+    "Description" TEXT,
+    "IndustryId" INT REFERENCES "Industries"("Id"),
+    "CreatedBy" INT REFERENCES "Users"("UserId"),
+    "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "IsActive" BOOLEAN DEFAULT TRUE,
+    "IsDeleted" BOOLEAN DEFAULT FALSE,
+    "Flag" BOOLEAN DEFAULT TRUE
+);
+
+
+
+
+
+
+
+
+
+
+select * from Users1
+ 
+ 
+ 
+-- Create a table to store user roles (optional, for this example)
+
+CREATE TABLE roles (
+
+    role_id SERIAL PRIMARY KEY,
+
+    role_name VARCHAR(100)
+
+);
+ 
+-- Create the users table
+
+CREATE TABLE users1 (
+
+    user_id SERIAL PRIMARY KEY,  -- The user ID
+
+    email VARCHAR(255) UNIQUE NOT NULL,  -- User's email
+
+    password TEXT NOT NULL,  -- Encrypted password
+
+    first_name VARCHAR(100) NOT NULL,  -- First name
+
+    last_name VARCHAR(100) NOT NULL,  -- Last name
+
+    reporting_manager_id INTEGER REFERENCES users1(user_id) ON DELETE SET NULL,  -- Self-referential foreign key
+
+    address TEXT,  -- Address of the user
+
+    created_by INTEGER,  -- Created by user ID
+
+    modified_by INTEGER,  -- Last modified by user ID
+
+    active BOOLEAN DEFAULT TRUE,  -- Active status
+
+    flag BOOLEAN DEFAULT FALSE,  -- Additional flag
+
+    role_id INTEGER REFERENCES roles(role_id),  -- Role of the user
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- Created timestamp
+
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Last updated timestamp
+
+);
+ 
+-- Insert some dummy roles
+
+INSERT INTO roles (role_name) VALUES
+
+('Admin'),
+
+('Manager'),
+
+('Employee'),
+
+('Intern');
+ 
+-- Insert dummy data into users table
+
+INSERT INTO users1 (email, password, first_name, last_name, reporting_manager_id, address, created_by, modified_by, active, flag, role_id)
+
+VALUES 
+
+('manager2@example.com', 'encryptedpassword2', 'Eve', 'Wilson', 1, '789 Manager Ave', 1, 1, TRUE, FALSE, 2),
+
+('employee3@example.com', 'encryptedpassword5', 'Eve', 'Martinez', 2, '103 Employee Rd', 2, 2, TRUE, FALSE, 3),
+
+('employee4@example.com', 'encryptedpassword6', 'George', 'Smith', 3, '104 Employee Ave', 3, 3, TRUE, FALSE, 3),
+
+('intern2@example.com', 'encryptedpassword8', 'Irene', 'Johnson', 4, '106 Intern Ln', 4, 4, TRUE, FALSE, 4),
+
+('employee5@example.com', 'encryptedpassword9', 'Jack', 'Lee', 3, '107 Employee Blvd', 3, 3, TRUE, FALSE, 3),
+
+('employee6@example.com', 'encryptedpassword10', 'Kim', 'Taylor', 3, '108 Employee Pkwy', 3, 3, TRUE, FALSE, 3),
+
+('employee7@example.com', 'encryptedpassword11', 'Liam', 'Walker', 3, '109 Employee Dr', 3, 3, TRUE, FALSE, 3),
+
+('employee8@example.com', 'encryptedpassword12', 'Mia', 'Allen', 2, '110 Employee St', 2, 2, TRUE, FALSE, 3),
+
+('employee9@example.com', 'encryptedpassword13', 'Noah', 'Harris', 2, '111 Employee Ln', 2, 2, TRUE, FALSE, 3),
+
+('intern3@example.com', 'encryptedpassword14', 'Olivia', 'Clark', 5, '112 Intern Rd', 5, 5, TRUE, FALSE, 4),
+
+('intern4@example.com', 'encryptedpassword15', 'Peyton', 'Lewis', 5, '113 Intern Blvd', 5, 5, TRUE, FALSE, 4);
+ 
+ 
+WITH RECURSIVE employee_hierarchy AS (
+
+    -- Base case: Get all top-level managers or direct subordinates for reporting managers
+
+    SELECT user_id, first_name, last_name, role_id, reporting_manager_id
+
+    FROM users1
+
+    WHERE reporting_manager_id IS NULL  -- Top-level manager (e.g., Alice)
+
+    UNION ALL
+
+    -- Recursive case: Get all subordinates for the reporting managers
+
+    SELECT u.user_id, u.first_name, u.last_name, u.role_id, u.reporting_manager_id
+
+    FROM users1 u
+
+    INNER JOIN employee_hierarchy eh ON u.reporting_manager_id = eh.user_id
+
+)
+
+SELECT 
+
+    eh.user_id,
+
+    eh.first_name,
+
+    eh.last_name,
+
+    r.role_name,
+
+    eh.reporting_manager_id
+
+FROM employee_hierarchy eh
+
+LEFT JOIN roles r ON eh.role_id = r.role_id
+
+ORDER BY eh.reporting_manager_id, eh.user_id;
+ 
+ 
+ 
+WITH RECURSIVE employee_hierarchy AS (
+
+    -- Base case: Get the logged-in user's direct subordinates
+
+    SELECT user_id, first_name, last_name, role_id, reporting_manager_id
+
+    FROM users1
+
+    WHERE reporting_manager_id = 3  -- Show direct reports for user with ID = 2 (Bob Smith)
+
+    UNION ALL
+
+    -- Recursive case: Get all subordinates of the direct reports (and so on recursively)
+
+    SELECT u.user_id, u.first_name, u.last_name, u.role_id, u.reporting_manager_id
+
+    FROM users1 u
+
+    INNER JOIN employee_hierarchy eh ON u.reporting_manager_id = eh.user_id  -- Join to get subordinates of subordinates
+
+)
+
+SELECT 
+
+    eh.user_id,
+
+    eh.first_name,
+
+    eh.last_name,
+
+    r.role_name,
+
+    eh.reporting_manager_id
+
+FROM employee_hierarchy eh
+
+LEFT JOIN roles r ON eh.role_id = r.role_id
+
+ORDER BY eh.reporting_manager_id, eh.user_id;
+ --------------------------------------------------------------------------------
+
+
+ WITH RECURSIVE employee_hierarchy AS (
+    SELECT 
+        user_id,
+        first_name,
+        last_name,
+        role_id,
+        reporting_manager_id
+    FROM users1
+    WHERE reporting_manager_id = 1
+    
+    UNION ALL
+    
+    SELECT 
+        u.user_id,
+        u.first_name,
+        u.last_name,
+        u.role_id,
+        u.reporting_manager_id
+    FROM users1 u
+    INNER JOIN employee_hierarchy eh
+        ON u.reporting_manager_id = eh.user_id
+)
+SELECT 
+    eh.user_id,
+    eh.first_name,
+    eh.last_name,
+    r.role_name,
+    eh.reporting_manager_id
+FROM employee_hierarchy eh
+LEFT JOIN roles r 
+    ON eh.role_id = r.role_id
+ORDER BY eh.reporting_manager_id, eh.user_id;
+
+ 
