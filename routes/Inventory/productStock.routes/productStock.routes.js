@@ -1,47 +1,35 @@
+// routes/InventoryApis/productStockRoutes.js
 const express = require("express");
-
 const router = express.Router();
-
 const {
-
     createProductStock,
-
     updateProductStock,
-
-    softDeleteProductStock,
-
-    hardDeleteProductStock,
-
+    adjustStockQuantity,
+    transferStock,
     getProductStockById,
-
-    getAllProductStocks
-
+    getAllProductStocks,
+    getStockByProduct,
+    getStockByWarehouse,
+    getLowStockItems,
+    softDeleteProductStock,
+    hardDeleteProductStock
 } = require("../../../controllers/InventoryApis/productStockcontroller");
- 
-// Create Product Stock Entry
 
-router.post("/", createProductStock);
- 
-// Update Product Stock by Id
-
-router.put("/:id", updateProductStock);
- 
-// Soft Delete Product Stock by Id
-
-router.patch("/soft-delete/:id", softDeleteProductStock);
- 
-// Hard Delete Product Stock by Id
-
-router.delete("/hard-delete/:id", hardDeleteProductStock);
- 
-// Get Product Stock by Id
-
-router.get("/:id", getProductStockById);
- 
-// Get All Product Stocks (with pagination)
-
+// Get routes
 router.get("/", getAllProductStocks);
- 
-module.exports = router;
+router.get("/low-stock", getLowStockItems);
+router.get("/product/:productId", getStockByProduct);
+router.get("/warehouse/:warehouseId", getStockByWarehouse);
+router.get("/:id", getProductStockById);
 
- 
+// Create & Update routes
+router.post("/", createProductStock);
+router.put("/:id", updateProductStock);
+router.post("/:id/adjust", adjustStockQuantity);
+router.post("/transfer", transferStock);
+
+// Delete routes
+router.patch("/:id/soft", softDeleteProductStock);
+router.delete("/:id/hard", hardDeleteProductStock);
+
+module.exports = router;

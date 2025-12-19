@@ -42,7 +42,7 @@ app.use('/api/productcategory',productCategoryRoutes)
 app.use('/api/units', UnitRoutes);
 app.use('/api/products', ProductsRoutes);
 app.use('/api/warehouses', warehousesRoutes);
-app.use('/api/productperWarehouseStock', productStock);
+app.use('/api/product-stock', productStock);
 app.use('/api/StockMovements', StockMovements);
 app.use('/api/Suppliers', Suppliers);
 app.use('/api/PurchaseOrders', PurchaseOrders);

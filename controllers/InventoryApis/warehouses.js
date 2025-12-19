@@ -1,4 +1,3 @@
-// controllers/warehouseController.js
 const { appPool } = require("../../config/db");
 
 // ✅ Generate Unique Warehouse Code
@@ -23,7 +22,7 @@ const generateWarehouseCode = async () => {
     }
 };
 
-// ✅ Create Warehouse
+// ✅ FIXED Create Warehouse - Removed ManagerId from INSERT
 const createWarehouse = async (req, res) => {
     const {
         Name,
@@ -72,11 +71,14 @@ const createWarehouse = async (req, res) => {
             });
         }
 
+        // ✅ Convert empty ManagerId to null
+        const validManagerId = ManagerId && ManagerId !== '' ? parseInt(ManagerId) : null;
+
         // Check if manager exists (if provided)
-        if (ManagerId) {
+        if (validManagerId) {
             const managerCheck = await client.query(
                 `SELECT "UserId" FROM "Users" WHERE "UserId" = $1`,
-                [ManagerId]
+                [validManagerId]
             );
 
             if (managerCheck.rows.length === 0) {
@@ -88,6 +90,7 @@ const createWarehouse = async (req, res) => {
             }
         }
 
+        // ✅ FIXED: Added ManagerId back to query
         const query = `
             INSERT INTO "Warehouses"
             ("WarehouseCode", "Name", "Location", "Address", "City", "State", "Country", 
@@ -98,9 +101,22 @@ const createWarehouse = async (req, res) => {
         `;
 
         const values = [
-            warehouseCode, Name, Location, Address, City, State, Country,
-            PinCode, ContactPerson, ContactPhone, ContactEmail, ManagerId,
-            CompanyId, Capacity, CapacityUnit, req.user?.userId || null
+            warehouseCode,
+            Name,
+            Location || null,
+            Address || null,
+            City || null,
+            State || null,
+            Country || 'India',
+            PinCode || null,
+            ContactPerson || null,
+            ContactPhone || null,
+            ContactEmail || null,
+            validManagerId, // ✅ Now included
+            CompanyId,
+            Capacity && Capacity !== '' ? parseFloat(Capacity) : null,
+            CapacityUnit || 'sqft',
+            req.user?.userId || null
         ];
 
         const { rows } = await client.query(query, values);
@@ -117,7 +133,7 @@ const createWarehouse = async (req, res) => {
         await client.query('ROLLBACK');
         console.error("Error creating Warehouse:", error);
 
-        if (error.code === '23505') { // Unique violation
+        if (error.code === '23505') {
             return res.status(409).json({ 
                 success: false,
                 message: "Warehouse with this code already exists" 
@@ -126,14 +142,15 @@ const createWarehouse = async (req, res) => {
 
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error",
+            error: error.message
         });
     } finally {
         client.release();
     }
 };
 
-// ✅ Update Warehouse by Id
+// ✅ FIXED Update Warehouse
 const updateWarehouse = async (req, res) => {
     const { id } = req.params;
     const {
@@ -159,7 +176,6 @@ const updateWarehouse = async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // Check if warehouse exists
         const warehouseCheck = await client.query(
             `SELECT "Id" FROM "Warehouses" WHERE "Id" = $1`,
             [id]
@@ -173,7 +189,10 @@ const updateWarehouse = async (req, res) => {
             });
         }
 
-        // Check if company exists (if provided)
+        // ✅ Convert empty values to null
+        const validManagerId = ManagerId && ManagerId !== '' ? parseInt(ManagerId) : null;
+        const validCapacity = Capacity && Capacity !== '' ? parseFloat(Capacity) : null;
+
         if (CompanyId) {
             const companyCheck = await client.query(
                 `SELECT "Id" FROM "Companies" WHERE "Id" = $1 AND "IsActive" = true`,
@@ -189,11 +208,10 @@ const updateWarehouse = async (req, res) => {
             }
         }
 
-        // Check if manager exists (if provided)
-        if (ManagerId) {
+        if (validManagerId) {
             const managerCheck = await client.query(
                 `SELECT "UserId" FROM "Users" WHERE "UserId" = $1`,
-                [ManagerId]
+                [validManagerId]
             );
 
             if (managerCheck.rows.length === 0) {
@@ -229,9 +247,23 @@ const updateWarehouse = async (req, res) => {
         `;
 
         const values = [
-            Name, Location, Address, City, State, Country, PinCode,
-            ContactPerson, ContactPhone, ContactEmail, ManagerId, CompanyId,
-            Capacity, CapacityUnit, IsActive, req.user?.userId || null, id
+            Name || null,
+            Location || null,
+            Address || null,
+            City || null,
+            State || null,
+            Country || null,
+            PinCode || null,
+            ContactPerson || null,
+            ContactPhone || null,
+            ContactEmail || null,
+            validManagerId,
+            CompanyId || null,
+            validCapacity,
+            CapacityUnit || null,
+            IsActive !== undefined ? IsActive : null,
+            req.user?.userId || null,
+            id
         ];
 
         const { rows } = await client.query(query, values);
@@ -249,7 +281,8 @@ const updateWarehouse = async (req, res) => {
         console.error("Error updating Warehouse:", error);
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error",
+            error: error.message
         });
     } finally {
         client.release();
@@ -289,7 +322,7 @@ const softDeleteWarehouse = async (req, res) => {
         console.error("Error soft deleting Warehouse:", error);
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error"
         });
     }
 };
@@ -341,7 +374,7 @@ const hardDeleteWarehouse = async (req, res) => {
         console.error("Error hard deleting Warehouse:", error);
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error"
         });
     } finally {
         client.release();
@@ -381,12 +414,12 @@ const toggleWarehouseStatus = async (req, res) => {
         console.error("Error toggling Warehouse status:", error);
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error"
         });
     }
 };
 
-// ✅ Get Warehouse by Id with Relations
+// ✅ Get Warehouse by Id
 const getWarehouseById = async (req, res) => {
     const { id } = req.params;
 
@@ -426,12 +459,12 @@ const getWarehouseById = async (req, res) => {
         console.error("Error fetching Warehouse by Id:", error);
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error"
         });
     }
 };
 
-// ✅ Get All Warehouses with Advanced Filtering, Search & Pagination
+// ✅ Get All Warehouses
 const getAllWarehouses = async (req, res) => {
     const {
         limit = 10,
@@ -446,7 +479,6 @@ const getAllWarehouses = async (req, res) => {
         sortOrder = 'DESC'
     } = req.query;
 
-    // Validate sortBy to prevent SQL injection
     const allowedSortFields = ['CreatedAt', 'Name', 'WarehouseCode', 'City', 'State'];
     const validSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'CreatedAt';
     const validSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
@@ -455,7 +487,6 @@ const getAllWarehouses = async (req, res) => {
     let queryParams = [];
     let paramCount = 1;
 
-    // Search filter
     if (search) {
         whereConditions.push(`(
             w."Name" ILIKE $${paramCount} OR 
@@ -468,35 +499,30 @@ const getAllWarehouses = async (req, res) => {
         paramCount++;
     }
 
-    // Company filter
     if (companyId) {
         whereConditions.push(`w."CompanyId" = $${paramCount}`);
         queryParams.push(companyId);
         paramCount++;
     }
 
-    // Manager filter
     if (managerId) {
         whereConditions.push(`w."ManagerId" = $${paramCount}`);
         queryParams.push(managerId);
         paramCount++;
     }
 
-    // Active status filter
     if (isActive !== undefined && isActive !== '') {
         whereConditions.push(`w."IsActive" = $${paramCount}`);
         queryParams.push(isActive === 'true');
         paramCount++;
     }
 
-    // City filter
     if (city) {
         whereConditions.push(`w."City" ILIKE $${paramCount}`);
         queryParams.push(`%${city}%`);
         paramCount++;
     }
 
-    // State filter
     if (state) {
         whereConditions.push(`w."State" ILIKE $${paramCount}`);
         queryParams.push(`%${state}%`);
@@ -507,14 +533,12 @@ const getAllWarehouses = async (req, res) => {
         ? `WHERE ${whereConditions.join(' AND ')}`
         : '';
 
-    // Count query
     const countQuery = `
         SELECT COUNT(*) as total
         FROM "Warehouses" w
         ${whereClause};
     `;
 
-    // Data query with joins
     const dataQuery = `
         SELECT 
             w.*,
@@ -530,11 +554,9 @@ const getAllWarehouses = async (req, res) => {
     `;
 
     try {
-        // Get total count
         const countResult = await appPool.query(countQuery, queryParams);
         const total = parseInt(countResult.rows[0].total);
 
-        // Get paginated data
         const dataResult = await appPool.query(dataQuery, [
             ...queryParams,
             parseInt(limit),
@@ -562,12 +584,12 @@ const getAllWarehouses = async (req, res) => {
         console.error("Error fetching all Warehouses:", error);
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error"
         });
     }
 };
 
-// ✅ Get Active Warehouses (for dropdowns)
+// ✅ Get Active Warehouses
 const getActiveWarehouses = async (req, res) => {
     const { companyId } = req.query;
 
@@ -604,12 +626,12 @@ const getActiveWarehouses = async (req, res) => {
         console.error("Error fetching active Warehouses:", error);
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error"
         });
     }
 };
 
-// ✅ Get Warehouses by Company
+// ✅ FIXED Get Warehouses by Company - Removed Stock count
 const getWarehousesByCompany = async (req, res) => {
     const { companyId } = req.params;
     const { includeInactive = false } = req.query;
@@ -617,11 +639,9 @@ const getWarehousesByCompany = async (req, res) => {
     let query = `
         SELECT 
             w.*,
-            u."Name" as "ManagerName",
-            COUNT(s."Id") as "StockItemsCount"
+            u."Name" as "ManagerName"
         FROM "Warehouses" w
         LEFT JOIN "Users" u ON w."ManagerId" = u."UserId"
-        LEFT JOIN "Stock" s ON w."Id" = s."WarehouseId"
         WHERE w."CompanyId" = $1
     `;
 
@@ -629,10 +649,7 @@ const getWarehousesByCompany = async (req, res) => {
         query += ` AND w."IsActive" = true`;
     }
 
-    query += `
-        GROUP BY w."Id", u."Name"
-        ORDER BY w."Name" ASC;
-    `;
+    query += ` ORDER BY w."Name" ASC;`;
 
     try {
         const { rows } = await appPool.query(query, [companyId]);
@@ -646,12 +663,12 @@ const getWarehousesByCompany = async (req, res) => {
         console.error("Error fetching Warehouses by Company:", error);
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error"
         });
     }
 };
 
-// ✅ Bulk Import Warehouses
+// ✅ FIXED Bulk Import Warehouses
 const bulkImportWarehouses = async (req, res) => {
     const { warehouses } = req.body;
 
@@ -685,7 +702,7 @@ const bulkImportWarehouses = async (req, res) => {
                 const { rows } = await client.query(query, [
                     warehouseCode,
                     warehouse.Name,
-                    warehouse.Location,
+                    warehouse.Location || null,
                     warehouse.CompanyId,
                     req.user?.userId || null
                 ]);
@@ -713,7 +730,7 @@ const bulkImportWarehouses = async (req, res) => {
         console.error("Error bulk importing Warehouses:", error);
         res.status(500).json({ 
             success: false,
-            message: "Internal server error" 
+            message: "Internal server error"
         });
     } finally {
         client.release();
