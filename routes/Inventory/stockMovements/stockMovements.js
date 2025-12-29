@@ -1,47 +1,33 @@
 const express = require("express");
-
 const router = express.Router();
-
 const {
-
     createStockMovement,
-
     updateStockMovement,
-
-    softDeleteStockMovement,
-
     hardDeleteStockMovement,
-
     getStockMovementById,
-
-    getAllStockMovements
-
+    getAllStockMovements,
+    getStockMovementStats,
+    getRecentStockMovements
 } = require("../../../controllers/InventoryApis/stockMovements");
- 
-// Create StockMovement
+// /api/stock-movements/stats
+router.get("/stats", getStockMovementStats);
 
-router.post("/", createStockMovement);
- 
-// Update StockMovement by Id
+// /api/stock-movements/recent
+router.get("/recent", getRecentStockMovements);
 
-router.put("/:id", updateStockMovement);
- 
-// Soft Delete StockMovement by Id
-
-router.patch("/soft-delete/:id", softDeleteStockMovement);
- 
-// Hard Delete StockMovement by Id
-
-router.delete("/hard-delete/:id", hardDeleteStockMovement);
- 
-// Get StockMovement by Id
-
-router.get("/:id", getStockMovementById);
- 
-// Get All StockMovements (with pagination)
-
+// /api/stock-movements?limit=&offset=&...
 router.get("/", getAllStockMovements);
- 
-module.exports = router;
 
- 
+// /api/stock-movements/:id
+router.get("/:id", getStockMovementById);
+
+// POST /api/stock-movements
+router.post("/", createStockMovement);
+
+// PUT /api/stock-movements/:id
+router.put("/:id", updateStockMovement);
+
+// DELETE /api/stock-movements/:id
+router.delete("/:id", hardDeleteStockMovement);
+
+module.exports = router;

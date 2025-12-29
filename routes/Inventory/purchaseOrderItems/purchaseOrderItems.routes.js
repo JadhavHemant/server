@@ -1,47 +1,37 @@
+// routes/Inventory/purchaseOrderItems/purchaseOrderItems.routes.js
 const express = require("express");
-
 const router = express.Router();
 
 const {
-
     createPurchaseOrderItem,
-
     updatePurchaseOrderItem,
-
-    softDeletePurchaseOrderItem,
-
-    hardDeletePurchaseOrderItem,
-
+    bulkUpdateReceivedQuantities,
+    deletePurchaseOrderItem,
     getPurchaseOrderItemById,
-
-    getAllPurchaseOrderItems
-
+    getItemsByPurchaseOrderId,
+    getAllPurchaseOrderItems,
+    getPurchaseOrderSummary
 } = require("../../../controllers/InventoryApis/purchaseOrderItems");
- 
-// Create PurchaseOrderItem
 
-router.post("/", createPurchaseOrderItem);
- 
-// Update PurchaseOrderItem by Id
+console.log("✅ PO Items Route handlers loaded:", {
+    createPurchaseOrderItem: typeof createPurchaseOrderItem,
+    updatePurchaseOrderItem: typeof updatePurchaseOrderItem,
+    bulkUpdateReceivedQuantities: typeof bulkUpdateReceivedQuantities,
+    deletePurchaseOrderItem: typeof deletePurchaseOrderItem,
+    getPurchaseOrderItemById: typeof getPurchaseOrderItemById,
+    getItemsByPurchaseOrderId: typeof getItemsByPurchaseOrderId,
+    getAllPurchaseOrderItems: typeof getAllPurchaseOrderItems,
+    getPurchaseOrderSummary: typeof getPurchaseOrderSummary
+});
 
-router.put("/:id", updatePurchaseOrderItem);
- 
-// Soft Delete PurchaseOrderItem by Id
-
-router.patch("/soft-delete/:id", softDeletePurchaseOrderItem);
- 
-// Hard Delete PurchaseOrderItem by Id
-
-router.delete("/hard-delete/:id", hardDeletePurchaseOrderItem);
- 
-// Get PurchaseOrderItem by Id
-
+// Routes (specific before generic)
+router.get("/summary/:purchaseOrderId", getPurchaseOrderSummary);
+router.get("/purchase-order/:purchaseOrderId", getItemsByPurchaseOrderId);
+router.patch("/bulk-receive", bulkUpdateReceivedQuantities);
 router.get("/:id", getPurchaseOrderItemById);
- 
-// Get All PurchaseOrderItems (with pagination)
-
 router.get("/", getAllPurchaseOrderItems);
- 
-module.exports = router;
+router.post("/", createPurchaseOrderItem);
+router.put("/:id", updatePurchaseOrderItem);
+router.delete("/:id", deletePurchaseOrderItem);
 
- 
+module.exports = router;

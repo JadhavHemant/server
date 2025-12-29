@@ -1,47 +1,43 @@
+// routes/InventoryApis/purchaseOrders/index.js
 const express = require("express");
-
 const router = express.Router();
-
 const {
-
     createPurchaseOrder,
-
     updatePurchaseOrder,
-
+    updatePurchaseOrderStatus,
     softDeletePurchaseOrder,
-
     hardDeletePurchaseOrder,
-
     getPurchaseOrderById,
-
-    getAllPurchaseOrders
-
+    getAllPurchaseOrders,
+    getPurchaseOrdersBySupplier,
+    getPurchaseOrderStats
 } = require("../../../controllers/InventoryApis/purchaseOrders");
- 
-// Create PurchaseOrder
 
-router.post("/", createPurchaseOrder);
- 
-// Update PurchaseOrder by Id
+// Get Purchase Order Statistics
+router.get("/stats", getPurchaseOrderStats);
 
-router.put("/:id", updatePurchaseOrder);
- 
-// Soft Delete PurchaseOrder by Id
+// Get Purchase Orders by Supplier
+router.get("/supplier/:supplierId", getPurchaseOrdersBySupplier);
 
-router.patch("/soft-delete/:id", softDeletePurchaseOrder);
- 
-// Hard Delete PurchaseOrder by Id
-
-router.delete("/hard-delete/:id", hardDeletePurchaseOrder);
- 
-// Get PurchaseOrder by Id
-
-router.get("/:id", getPurchaseOrderById);
- 
-// Get All PurchaseOrders (with pagination)
-
+// Get All Purchase Orders (with pagination & filters)
 router.get("/", getAllPurchaseOrders);
- 
-module.exports = router;
 
- 
+// Get Purchase Order by Id
+router.get("/:id", getPurchaseOrderById);
+
+// Create Purchase Order
+router.post("/", createPurchaseOrder);
+
+// Update Purchase Order by Id
+router.put("/:id", updatePurchaseOrder);
+
+// Update Purchase Order Status
+router.patch("/:id/status", updatePurchaseOrderStatus);
+
+// Soft Delete Purchase Order by Id (Cancel)
+router.patch("/soft-delete/:id", softDeletePurchaseOrder);
+
+// Hard Delete Purchase Order by Id
+router.delete("/hard-delete/:id", hardDeletePurchaseOrder);
+
+module.exports = router;
