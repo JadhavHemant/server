@@ -1,47 +1,53 @@
-const express = require("express");
+// routes/Inventory/salesOrders/salesOrders.routes.js
 
+const express = require("express");
 const router = express.Router();
 
 const {
-
     createSalesOrder,
-
     updateSalesOrder,
-
+    updateSalesOrderStatus,
+    updatePayment,
     softDeleteSalesOrder,
-
+    restoreSalesOrder,
     hardDeleteSalesOrder,
-
     getSalesOrderById,
-
-    getAllSalesOrders
-
+    getAllSalesOrders,
+    getSalesOrderStats,
+    getSalesOrdersByCustomer
 } = require("../../../controllers/InventoryApis/salesOrders");
- 
-// Create SalesOrder
 
-router.post("/", createSalesOrder);
- 
-// Update SalesOrder by Id
+// Statistics
+router.get("/stats", getSalesOrderStats);
 
-router.put("/:id", updateSalesOrder);
- 
-// Soft Delete SalesOrder by Id
+// Get by Customer
+router.get("/customer/:customerId", getSalesOrdersByCustomer);
 
-router.patch("/soft-delete/:id", softDeleteSalesOrder);
- 
-// Hard Delete SalesOrder by Id
-
-router.delete("/hard-delete/:id", hardDeleteSalesOrder);
- 
-// Get SalesOrder by Id
-
-router.get("/:id", getSalesOrderById);
- 
-// Get All SalesOrders (with pagination)
-
+// Get All (with filters)
 router.get("/", getAllSalesOrders);
- 
-module.exports = router;
 
- 
+// Get by ID
+router.get("/:id", getSalesOrderById);
+
+// Create
+router.post("/", createSalesOrder);
+
+// Update
+router.put("/:id", updateSalesOrder);
+
+// Update Status
+router.patch("/:id/status", updateSalesOrderStatus);
+
+// Update Payment
+router.patch("/:id/payment", updatePayment);
+
+// Restore
+router.patch("/:id/restore", restoreSalesOrder);
+
+// Soft Delete
+router.patch("/:id/soft-delete", softDeleteSalesOrder);
+
+// Hard Delete
+router.delete("/:id", hardDeleteSalesOrder);
+
+module.exports = router;
