@@ -19,6 +19,7 @@ const Accounts = async () => {
     
     `
     await appPool.query(query);
+    await appPool.query('ALTER TABLE "Accounts" ADD COLUMN IF NOT EXISTS "UpdatedBy" INT REFERENCES "Users"("UserId") ON DELETE SET NULL;');
     console.log("✅ Accounts table ready")
 }
 

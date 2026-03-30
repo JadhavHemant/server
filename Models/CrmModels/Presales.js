@@ -32,6 +32,7 @@ const  Presales= async () => {
 );
     `
     await appPool.query(query);
+    await appPool.query('ALTER TABLE "Presales" ADD COLUMN IF NOT EXISTS "UpdatedBy" INT REFERENCES "Users"("UserId") ON DELETE SET NULL;');
     console.log("✅ Presales table ready")
 }
 

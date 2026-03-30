@@ -24,6 +24,13 @@ router.post('/create', uploadProductImage.single('productImage'), createProduct)
 // Get all products with filters and pagination
 router.get('/list', getAllProducts);
 
+// Get active products (matches client expectation: GET /products/active)
+// Reuses `getAllProducts` with `isActive=true`.
+router.get('/active', (req, res, next) => {
+    req.query.isActive = 'true';
+    return getAllProducts(req, res, next);
+});
+
 // Get low stock products (BEFORE /:id)
 router.get('/alerts/low-stock', getLowStockProducts);
 

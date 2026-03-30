@@ -39,7 +39,10 @@ const {
   toggleFlag,
   forgotPassword,
   resetPassword,
-  getOrgHierarchy, // NEW
+  getOrgHierarchy,
+  getMyTeamHierarchy,
+  getDirectReports,
+  getCompanyOrgChart,
 } = require('../../controllers/UserApis/userController');
 const { verifyAccessToken } = require('../../middlewares/authMiddleware');
 
@@ -51,6 +54,9 @@ router.get('/getall/profiles', getAllUsers);
 
 // Org hierarchy (could be open or protected; here: protected)
 router.get('/org/hierarchy', verifyAccessToken, getOrgHierarchy);
+router.get('/my-team', verifyAccessToken, getMyTeamHierarchy);
+router.get('/direct-reports/:userId', verifyAccessToken, getDirectReports);
+router.get('/company/:companyId/org-chart', verifyAccessToken, getCompanyOrgChart);
 
 // APIs With Token
 router.get('/profile', verifyAccessToken, getProfile);

@@ -1,0 +1,182 @@
+const { createCrudController } = require("./crmCrudFactory");
+
+const accountController = createCrudController({
+  tableName: "Accounts",
+  fields: [
+    "CompanyId",
+    "Name",
+    "Website",
+    "Description",
+    "IndustryId",
+    "CreatedBy",
+    "IsActive",
+    "IsDeleted",
+    "Flag",
+  ],
+  searchColumns: ['a."Name"', 'a."Website"', 'i."Name"'],
+  alias: "a",
+  joins: 'LEFT JOIN "Industries" i ON i."Id" = a."IndustryId"',
+  selectColumns: ['a.*', 'i."Name" AS "IndustryName"'],
+  defaultFilters: ['a."IsDeleted" = FALSE'],
+});
+
+const contactController = createCrudController({
+  tableName: "Contacts",
+  fields: [
+    "CompanyId",
+    "AccountId",
+    "FirstName",
+    "MiddleName",
+    "LastName",
+    "Email",
+    "Phone",
+    "AltPhone",
+    "LinkedinUrl",
+    "Title",
+    "CreatedBy",
+    "IsActive",
+    "IsDeleted",
+    "Flag",
+  ],
+  searchColumns: ['c."FirstName"', 'c."LastName"', 'c."Email"', 'c."Phone"'],
+  alias: "c",
+  joins: 'LEFT JOIN "Accounts" a ON a."Id" = c."AccountId"',
+  selectColumns: ['c.*', 'a."Name" AS "AccountName"'],
+  defaultFilters: ['c."IsDeleted" = FALSE'],
+});
+
+const leadController = createCrudController({
+  tableName: "Leads",
+  fields: [
+    "CompanyId",
+    "AccountId",
+    "ContactId",
+    "LeadSourceId",
+    "ProductCategoryId",
+    "FollowupTypeId",
+    "IndustryId",
+    "Status",
+    "Rating",
+    "Description",
+    "Comments",
+    "AssignedTo",
+    "AssignedFrom",
+    "CreatedBy",
+    "IsActive",
+    "IsDeleted",
+    "Flag",
+  ],
+  searchColumns: ['a."Name"', 'co."FirstName"', 'co."LastName"', 'l."Status"', 'l."Description"'],
+  alias: "l",
+  joins: `
+    LEFT JOIN "Accounts" a ON a."Id" = l."AccountId"
+    LEFT JOIN "Contacts" co ON co."Id" = l."ContactId"
+  `,
+  selectColumns: [
+    'l.*',
+    'a."Name" AS "AccountName"',
+    `TRIM(COALESCE(co."FirstName", '') || ' ' || COALESCE(co."LastName", '')) AS "ContactName"`,
+  ],
+  defaultFilters: ['l."IsDeleted" = FALSE'],
+});
+
+const opportunityController = createCrudController({
+  tableName: "Opportunities",
+  fields: [
+    "CompanyId",
+    "AccountId",
+    "ContactId",
+    "OpportunityName",
+    "SalesStageId",
+    "LeadSourceId",
+    "ProductCategoryId",
+    "IndustryId",
+    "BudgetAmount",
+    "EstCloseDate",
+    "Description",
+    "QualificationComments",
+    "DetailedSummary",
+    "AssignedTo",
+    "AssignedFrom",
+    "CreatedBy",
+    "IsActive",
+    "IsDeleted",
+    "Flag",
+  ],
+  searchColumns: ['o."OpportunityName"', 'a."Name"', 's."Name"', 'o."Description"'],
+  alias: "o",
+  joins: `
+    LEFT JOIN "Accounts" a ON a."Id" = o."AccountId"
+    LEFT JOIN "SalesStages" s ON s."Id" = o."SalesStageId"
+  `,
+  selectColumns: ['o.*', 'a."Name" AS "AccountName"', 's."Name" AS "SalesStageName"'],
+  defaultFilters: ['o."IsDeleted" = FALSE'],
+});
+
+const presalesController = createCrudController({
+  tableName: "Presales",
+  fields: [
+    "CompanyId",
+    "LeadId",
+    "OpportunityId",
+    "ClientName",
+    "RelatedTo",
+    "StartDate",
+    "EndDate",
+    "ETA",
+    "DurationMinutes",
+    "Status",
+    "Hyperscaler",
+    "FollowUpTriggerStatus",
+    "TaskTypeId",
+    "Documents",
+    "DetailedSummary",
+    "Description",
+    "Comments",
+    "AssignedTo",
+    "AssignedFrom",
+    "CreatedBy",
+    "IsActive",
+    "IsDeleted",
+    "Flag",
+  ],
+  searchColumns: ['p."ClientName"', 'p."RelatedTo"', 'tt."Name"', 'p."Status"'],
+  alias: "p",
+  joins: 'LEFT JOIN "TaskTypes" tt ON tt."Id" = p."TaskTypeId"',
+  selectColumns: ['p.*', 'tt."Name" AS "TaskTypeName"'],
+  defaultFilters: ['p."IsDeleted" = FALSE'],
+});
+
+const caseController = createCrudController({
+  tableName: "Cases",
+  fields: [
+    "CompanyId",
+    "AccountId",
+    "ContactId",
+    "LeadId",
+    "OpportunityId",
+    "Subject",
+    "Status",
+    "Priority",
+    "Description",
+    "Resolution",
+    "AssignedTo",
+    "AssignedFrom",
+    "CreatedBy",
+    "IsActive",
+    "IsDeleted",
+    "Flag",
+  ],
+  searchColumns: ['cs."Subject"', 'cs."Status"', 'cs."Priority"'],
+  alias: "cs",
+  defaultFilters: ['cs."IsDeleted" = FALSE'],
+});
+
+module.exports = {
+  accountController,
+  contactController,
+  leadController,
+  opportunityController,
+  presalesController,
+  caseController,
+};

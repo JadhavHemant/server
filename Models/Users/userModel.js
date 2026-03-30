@@ -1,8 +1,8 @@
-const { appPool } = require('../../config/db');
+const { appPool } = require("../../config/db");
 
 const createUsersTable = async () => {
-  const query = `
-CREATE TABLE IF NOT EXISTS "Users" (
+  await appPool.query(`
+    CREATE TABLE IF NOT EXISTS "Users" (
       "UserId" SERIAL PRIMARY KEY,
       "Name" VARCHAR(255) NOT NULL,
       "Email" VARCHAR(255) NOT NULL UNIQUE,
@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS "Users" (
       "CompanyId" INT REFERENCES "Companies"("Id") ON DELETE CASCADE,
       "UserTypeId" INT REFERENCES "UserTypes"("Id") ON DELETE CASCADE,
       "ReportingManagerId" INT REFERENCES "Users"("UserId") ON DELETE SET NULL,
+      "DepartmentId" INT,
+      "DesignationId" INT,
+      "HierarchyLevel" INT DEFAULT 0,
       "CreatedBy" INT REFERENCES "Users"("UserId"),
       "Address" TEXT,
       "City" VARCHAR(100),
@@ -25,9 +28,15 @@ CREATE TABLE IF NOT EXISTS "Users" (
       "CreatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       "UpdatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
-  `;
-  await appPool.query(query);
-  console.log("✅ Users table ready");
+  `);
+
+  await appPool.query('ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "FirstName" VARCHAR(255);');
+  await appPool.query('ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "LastName" VARCHAR(255);');
+  await appPool.query('ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Phone" VARCHAR(20);');
+  await appPool.query('ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "ProfilePicture" TEXT;');
+  await appPool.query('ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "HierarchyPath" TEXT;');
+
+  console.log("Users table ready");
 };
 
 module.exports = { createUsersTable };

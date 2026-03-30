@@ -33,12 +33,14 @@ const { Contacts } = require('./CrmModels/Contacts');
 const { Leads } = require('./CrmModels/Leads');
 const { Opportunities } = require('./CrmModels/Opportunities');
 const { Presales } = require('./CrmModels/Presales');
+const { Cases } = require('./CrmModels/Cases');
 const { Comments } = require('./CrmModels/Comments');
 const { PresalesAssignments } = require('./CrmModels/PresalesAssignments');
 const { Groups } = require('./CrmModels/Groups');
 const { GroupMembers } = require('./CrmModels/GroupMembers');
 const { Assignments } = require('./CrmModels/Assignments');
 const { EntityVisibility } = require('./CrmModels/EntityVisibility');
+const { createPlatformCoreTables } = require('./System/platformCore');
 
 const initModels = async () => {
   await Roles();
@@ -74,12 +76,14 @@ const initModels = async () => {
   await Leads();
   await Opportunities();
   await Presales();
+  await Cases();
   await Comments();
   await PresalesAssignments();
   await Groups();
   await GroupMembers();
   await Assignments();
   await EntityVisibility();
+  await createPlatformCoreTables();
 };
 
 module.exports = { initModels };

@@ -26,6 +26,7 @@ const  Leads= async () => {
 );
     `
     await appPool.query(query);
+    await appPool.query('ALTER TABLE "Leads" ADD COLUMN IF NOT EXISTS "UpdatedBy" INT REFERENCES "Users"("UserId") ON DELETE SET NULL;');
     console.log("✅ Leads table ready")
 }
 
