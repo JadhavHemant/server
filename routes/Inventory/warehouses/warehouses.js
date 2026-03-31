@@ -14,10 +14,10 @@ const {
 } = require('../../../controllers/InventoryApis/warehouses');
 
 
-router.get('/', getAllWarehouses);                         
-router.get('/active', getActiveWarehouses);                 
-router.get('/:id', getWarehouseById);                      
-router.get('/company/:companyId', getWarehousesByCompany); 
+router.get('/', getAllWarehouses);
+router.get('/active', getActiveWarehouses);
+router.get('/company/:companyId', getWarehousesByCompany);
+router.get('/:id', getWarehouseById);
 
 router.post('/', createWarehouse);                          
 router.put('/:id', updateWarehouse);                       

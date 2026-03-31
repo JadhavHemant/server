@@ -1,4 +1,5 @@
 const { appPool } = require("../../config/db");
+const { buildHierarchyAccess, isPrivilegedUser } = require("../../utils/hierarchyAccess");
 
 const generatePONumber = async () => {
   const result = await appPool.query(
@@ -66,7 +67,6 @@ const createPurchaseOrder = async (req, res) => {
     TotalAmount,
     Notes,
     CompanyId,
-    CreatedBy,
   } = req.body;
 
 
@@ -92,8 +92,8 @@ const createPurchaseOrder = async (req, res) => {
       ReceivedDate && ReceivedDate.trim() !== "" ? ReceivedDate : null;
     const cleanedTotalAmount =
       TotalAmount && TotalAmount !== "" ? parseFloat(TotalAmount) : 0;
-    const cleanedCompanyId = CompanyId && CompanyId !== "" ? CompanyId : null;
-    const cleanedCreatedBy = CreatedBy && CreatedBy !== "" ? CreatedBy : null;
+    const cleanedCompanyId = CompanyId && CompanyId !== "" ? CompanyId : req.user?.companyId || null;
+    const cleanedCreatedBy = req.user?.userId || null;
     const cleanedNotes = Notes && Notes.trim() !== "" ? Notes : null;
 
     console.log("🧹 Cleaned data:", {
@@ -269,7 +269,23 @@ const softDeletePurchaseOrder = async (req, res) => {
             RETURNING *;
         `;
 
-    const { rows } = await appPool.query(query, [id]);
+    let queryText = query;
+    let values = [id];
+
+    if (!isPrivilegedUser(req.user)) {
+      const scopedAccess = await buildHierarchyAccess({
+        req,
+        alias: "po",
+        ownerColumns: ["CreatedBy"],
+        values,
+      });
+      values = scopedAccess.values;
+      if (scopedAccess.clause) {
+        queryText += ` AND ${scopedAccess.clause}`;
+      }
+    }
+
+    const { rows } = await appPool.query(queryText, values);
 
     if (!rows.length) {
       return res.status(404).json({ message: "PurchaseOrder not found" });
@@ -365,7 +381,7 @@ const getAllPurchaseOrders = async (req, res) => {
   sortOrder = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
   const filters = [];
-  const values = [];
+  let values = [];
   let idx = 1;
 
   if (status) {
@@ -401,6 +417,18 @@ const getAllPurchaseOrders = async (req, res) => {
   if (endDate && endDate.trim() !== "") {
     filters.push(`po."OrderDate" <= $${idx++}`);
     values.push(endDate);
+  }
+
+  const scopedAccess = await buildHierarchyAccess({
+    req,
+    alias: "po",
+    ownerColumns: ["CreatedBy"],
+    values,
+  });
+  values = scopedAccess.values;
+  idx = values.length + 1;
+  if (scopedAccess.clause) {
+    filters.push(scopedAccess.clause);
   }
 
   const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";

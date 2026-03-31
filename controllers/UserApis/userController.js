@@ -2,11 +2,35 @@
 const { appPool } = require("../../config/db");
 const { generateTokens } = require("../../utils/tokenUtils");
 const fs = require("fs");
+const path = require("path");
 const { sendEmail } = require("../../utils/email");
 const crypto = require("crypto");
+const { normalizeStoredUploadPath, toFileSystemPath } = require("../../utils/filePaths");
 
 const passwordRegex =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+const serverRoot = path.resolve(__dirname, "..", "..");
+
+const safeDeleteStoredFile = (storedPath) => {
+  const absolutePath = toFileSystemPath(storedPath, serverRoot);
+  if (absolutePath && fs.existsSync(absolutePath)) {
+    fs.unlinkSync(absolutePath);
+  }
+};
+
+const normalizeNullableInt = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+};
+
+const normalizeNullableText = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return value;
+};
 
 const getHierarchyRows = async (rootUserId, includeRoot = true, companyId = null) => {
   const rootPredicate = includeRoot
@@ -65,6 +89,7 @@ const registerUser = async (req, res) => {
     password,
     mobileNumber,
     companyId,
+    roleId,
     userTypeId,
     createdBy,
     reportingManagerId,
@@ -96,37 +121,46 @@ const registerUser = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const userImage = req.file ? req.file.path.replace(/\\/g, "/") : null;
+    const userImage = req.file ? `/uploads/users/${req.file.filename}` : null;
+    const normalizedCompanyId = normalizeNullableInt(companyId);
+    const normalizedRoleId = normalizeNullableInt(roleId);
+    const normalizedUserTypeId = normalizeNullableInt(userTypeId);
+    const normalizedCreatedBy = normalizeNullableInt(createdBy);
+    const normalizedReportingManagerId = normalizeNullableInt(reportingManagerId);
+    const normalizedDepartmentId = normalizeNullableInt(departmentId);
+    const normalizedDesignationId = normalizeNullableInt(designationId);
+    const normalizedHierarchyLevel = normalizeNullableInt(hierarchyLevel) ?? 0;
 
     const result = await appPool.query(
       `
       INSERT INTO "Users"
       (
-        "Name","Email","Password","MobileNumber","CompanyId","UserTypeId",
+        "Name","Email","Password","MobileNumber","CompanyId","RoleId","UserTypeId",
         "CreatedBy","ReportingManagerId","DepartmentId","DesignationId","HierarchyLevel",
         "Address","City","State","Country","PostalCode","userImage"
       )
       VALUES
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
       RETURNING *;
       `,
       [
         name,
         email,
         hashedPassword,
-        mobileNumber || null,
-        companyId || null,
-        userTypeId || null,
-        createdBy || null,
-        reportingManagerId || null,
-        departmentId || null,
-        designationId || null,
-        hierarchyLevel || 0,
-        address || null,
-        city || null,
-        state || null,
-        country || null,
-        postalCode || null,
+        normalizeNullableText(mobileNumber),
+        normalizedCompanyId,
+        normalizedRoleId,
+        normalizedUserTypeId,
+        normalizedCreatedBy,
+        normalizedReportingManagerId,
+        normalizedDepartmentId,
+        normalizedDesignationId,
+        normalizedHierarchyLevel,
+        normalizeNullableText(address),
+        normalizeNullableText(city),
+        normalizeNullableText(state),
+        normalizeNullableText(country),
+        normalizeNullableText(postalCode),
         userImage,
       ]
     );
@@ -144,7 +178,7 @@ const registerUser = async (req, res) => {
         id: user.UserId,
         name: user.Name,
         email: user.Email,
-        image: user.userImage,
+        image: normalizeStoredUploadPath(user.userImage),
         reportingManagerId: user.ReportingManagerId,
       },
     });
@@ -163,6 +197,7 @@ const updateUser = async (req, res) => {
     password,
     mobileNumber,
     companyId,
+    roleId,
     userTypeId,
     reportingManagerId,
     departmentId,
@@ -183,9 +218,11 @@ const updateUser = async (req, res) => {
   }
 
   try {
+    const normalizedUserId = normalizeNullableInt(userId);
+
     const existingUserResult = await appPool.query(
       'SELECT * FROM "Users" WHERE "UserId" = $1',
-      [userId]
+      [normalizedUserId]
     );
 
     if (!existingUserResult.rows.length) {
@@ -197,13 +234,18 @@ const updateUser = async (req, res) => {
     const hashedPassword = password
       ? await bcrypt.hash(password, 10)
       : existingUser.Password;
+    const normalizedCompanyId = normalizeNullableInt(companyId);
+    const normalizedRoleId = normalizeNullableInt(roleId);
+    const normalizedUserTypeId = normalizeNullableInt(userTypeId);
+    const normalizedReportingManagerId = normalizeNullableInt(reportingManagerId);
+    const normalizedDepartmentId = normalizeNullableInt(departmentId);
+    const normalizedDesignationId = normalizeNullableInt(designationId);
+    const normalizedHierarchyLevel = normalizeNullableInt(hierarchyLevel);
 
-    let updatedImage = existingUser.userImage;
+    let updatedImage = normalizeStoredUploadPath(existingUser.userImage);
     if (req.file) {
-      updatedImage = req.file.path.replace(/\\/g, "/");
-      if (existingUser.userImage && fs.existsSync(existingUser.userImage)) {
-        fs.unlinkSync(existingUser.userImage);
-      }
+      updatedImage = `/uploads/users/${req.file.filename}`;
+      safeDeleteStoredFile(existingUser.userImage);
     }
 
     const updateQuery = `
@@ -213,18 +255,19 @@ const updateUser = async (req, res) => {
         "Password" = $3,
         "MobileNumber" = $4,
         "CompanyId" = $5,
-        "UserTypeId" = $6,
-        "Address" = $7,
-        "City" = $8,
-        "State" = $9,
-        "Country" = $10,
-        "PostalCode" = $11,
-        "userImage" = $12,
-        "ReportingManagerId" = $13,
-        "DepartmentId" = $14,
-        "DesignationId" = $15,
-        "HierarchyLevel" = $16
-      WHERE "UserId" = $17
+        "RoleId" = $6,
+        "UserTypeId" = $7,
+        "Address" = $8,
+        "City" = $9,
+        "State" = $10,
+        "Country" = $11,
+        "PostalCode" = $12,
+        "userImage" = $13,
+        "ReportingManagerId" = $14,
+        "DepartmentId" = $15,
+        "DesignationId" = $16,
+        "HierarchyLevel" = $17
+      WHERE "UserId" = $18
       RETURNING *;
     `;
 
@@ -232,20 +275,21 @@ const updateUser = async (req, res) => {
       name ?? existingUser.Name,
       email ?? existingUser.Email,
       hashedPassword,
-      mobileNumber ?? existingUser.MobileNumber,
-      companyId ?? existingUser.CompanyId,
-      userTypeId ?? existingUser.UserTypeId,
-      address ?? existingUser.Address,
-      city ?? existingUser.City,
-      state ?? existingUser.State,
-      country ?? existingUser.Country,
-      postalCode ?? existingUser.PostalCode,
+      normalizeNullableText(mobileNumber) ?? existingUser.MobileNumber,
+      normalizedCompanyId ?? existingUser.CompanyId,
+      normalizedRoleId ?? existingUser.RoleId,
+      normalizedUserTypeId ?? existingUser.UserTypeId,
+      normalizeNullableText(address) ?? existingUser.Address,
+      normalizeNullableText(city) ?? existingUser.City,
+      normalizeNullableText(state) ?? existingUser.State,
+      normalizeNullableText(country) ?? existingUser.Country,
+      normalizeNullableText(postalCode) ?? existingUser.PostalCode,
       updatedImage,
-      reportingManagerId ?? existingUser.ReportingManagerId,
-      departmentId ?? existingUser.DepartmentId,
-      designationId ?? existingUser.DesignationId,
-      hierarchyLevel ?? existingUser.HierarchyLevel ?? 0,
-      userId,
+      normalizedReportingManagerId ?? existingUser.ReportingManagerId,
+      normalizedDepartmentId ?? existingUser.DepartmentId,
+      normalizedDesignationId ?? existingUser.DesignationId,
+      normalizedHierarchyLevel ?? existingUser.HierarchyLevel ?? 0,
+      normalizedUserId,
     ];
 
     const result = await appPool.query(updateQuery, values);
@@ -263,7 +307,7 @@ const updateUser = async (req, res) => {
         id: user.UserId,
         name: user.Name,
         email: user.Email,
-        image: user.userImage,
+        image: normalizeStoredUploadPath(user.userImage),
         reportingManagerId: user.ReportingManagerId,
       },
     });
@@ -294,17 +338,20 @@ const loginUser = async (req, res) => {
 
     const tokens = await generateTokens(user);
 
-    res.status(200).json({
-      message: "Login successful",
-      user: {
-        id: user.UserId,
-        name: user.Name,
-        email: user.Email,
-        image: user.userImage,
-        reportingManagerId: user.ReportingManagerId,
-      },
-      ...tokens,
-    });
+      res.status(200).json({
+        message: "Login successful",
+        user: {
+          id: user.UserId,
+          name: user.Name,
+          email: user.Email,
+          image: normalizeStoredUploadPath(user.userImage),
+          roleId: user.RoleId,
+          userTypeId: user.UserTypeId,
+          companyId: user.CompanyId,
+          reportingManagerId: user.ReportingManagerId,
+        },
+        ...tokens,
+      });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -354,7 +401,13 @@ const getProfile = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    return res.status(200).json({ success: true, profile: user });
+      return res.status(200).json({
+        success: true,
+        profile: {
+          ...user,
+          image: normalizeStoredUploadPath(user.image),
+        },
+      });
   } catch (err) {
     console.error("Error fetching user profile:", err);
     return res.status(500).json({ message: "Server error" });
@@ -414,7 +467,7 @@ const getAllUsers = async (req, res) => {
       state: user.State,
       country: user.Country,
       postalCode: user.PostalCode,
-      image: user.userImage,
+      image: normalizeStoredUploadPath(user.userImage),
       isActive: user.IsActive,
       flag: user.Flag,
       isDelete: user.IsDelete,
@@ -740,12 +793,17 @@ const getCompanyOrgChart = async (req, res) => {
     const companyId = Number(req.params.companyId);
 
     const rootsQuery = `
-      SELECT "UserId"
-      FROM "Users"
-      WHERE "CompanyId" = $1
-      AND "ReportingManagerId" IS NULL
-      AND "IsDelete" = FALSE
-      ORDER BY "UserId";
+      SELECT child."UserId"
+      FROM "Users" child
+      LEFT JOIN "Users" manager ON manager."UserId" = child."ReportingManagerId"
+      WHERE child."CompanyId" = $1
+      AND child."IsDelete" = FALSE
+      AND (
+        child."ReportingManagerId" IS NULL
+        OR manager."UserId" IS NULL
+        OR manager."CompanyId" <> child."CompanyId"
+      )
+      ORDER BY child."UserId";
     `;
 
     const rootResult = await appPool.query(rootsQuery, [companyId]);

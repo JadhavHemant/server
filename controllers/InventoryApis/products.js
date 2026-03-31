@@ -1,6 +1,7 @@
 // controllers/InventoryApis/products.js
 
 const { appPool } = require("../../config/db");
+const { buildHierarchyAccess, isPrivilegedUser } = require("../../utils/hierarchyAccess");
 
 /**
  * Create Product
@@ -26,7 +27,6 @@ const createProduct = async (req, res) => {
     TaxRate,
     Discount,
     CompanyId,
-    CreatedBy,
     IsActive,
   } = req.body;
 
@@ -75,8 +75,8 @@ const createProduct = async (req, res) => {
       TaxRate || 0,
       Discount || 0,
       ProductImage,
-      CompanyId,
-      CreatedBy || null,
+      CompanyId || req.user?.companyId || null,
+      req.user?.userId || null,
       IsActive !== false,
     ]);
 
@@ -171,6 +171,18 @@ const getAllProducts = async (req, res) => {
     whereConditions.push(`p."StockQuantity" <= p."ReorderLevel"`);
   }
 
+  const scopedAccess = await buildHierarchyAccess({
+    req,
+    alias: "p",
+    ownerColumns: ["CreatedBy"],
+    values: queryParams,
+  });
+  queryParams = scopedAccess.values;
+  paramCount = queryParams.length + 1;
+  if (scopedAccess.clause) {
+    whereConditions.push(scopedAccess.clause);
+  }
+
   const whereClause = whereConditions.join(" AND ");
 
   // Count query
@@ -251,7 +263,20 @@ usr."Name" as "CreatedByName"        FROM "Products" p
         WHERE p."Id" = $1 AND p."IsDelete" = FALSE`;
 
   try {
-    const result = await appPool.query(query, [id]);
+    let queryText = query;
+    let values = [id];
+    if (!isPrivilegedUser(req.user)) {
+      const scopedAccess = await buildHierarchyAccess({
+        req,
+        alias: "p",
+        ownerColumns: ["CreatedBy"],
+        values,
+      });
+      values = scopedAccess.values;
+      queryText += scopedAccess.clause ? ` AND ${scopedAccess.clause}` : "";
+    }
+
+    const result = await appPool.query(queryText, values);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -299,7 +324,6 @@ const updateProduct = async (req, res) => {
     TaxRate,
     Discount,
     IsActive,
-    UpdatedBy,
   } = req.body;
 
   // Handle image upload
@@ -412,9 +436,9 @@ const updateProduct = async (req, res) => {
     queryParams.push(IsActive);
     paramCount++;
   }
-  if (UpdatedBy !== undefined) {
+  if (req.user?.userId) {
     updateFields.push(`"UpdatedBy" = $${paramCount}`);
-    queryParams.push(UpdatedBy);
+    queryParams.push(req.user.userId);
     paramCount++;
   }
 
@@ -428,13 +452,26 @@ const updateProduct = async (req, res) => {
   }
 
   queryParams.push(id);
-  const query = `
+  let query = `
         UPDATE "Products"
         SET ${updateFields.join(", ")}
         WHERE "Id" = $${paramCount} AND "IsDelete" = FALSE
         RETURNING *`;
 
   try {
+    if (!isPrivilegedUser(req.user)) {
+      const scopedAccess = await buildHierarchyAccess({
+        req,
+        alias: "Products",
+        ownerColumns: ["CreatedBy"],
+        values: queryParams,
+      });
+      queryParams.splice(0, queryParams.length, ...scopedAccess.values);
+      if (scopedAccess.clause) {
+        query = query.replace('RETURNING *', `AND ${scopedAccess.clause.replaceAll('Products.', '')} RETURNING *`);
+      }
+    }
+
     const result = await appPool.query(query, queryParams);
 
     if (result.rows.length === 0) {
@@ -473,14 +510,28 @@ const updateProduct = async (req, res) => {
 const softDeleteProduct = async (req, res) => {
   const { id } = req.params;
 
-  const query = `
+  let query = `
         UPDATE "Products" 
         SET "IsDelete" = TRUE, "DeletedAt" = CURRENT_TIMESTAMP, "UpdatedAt" = CURRENT_TIMESTAMP 
         WHERE "Id" = $1 AND "IsDelete" = FALSE
         RETURNING *`;
 
   try {
-    const result = await appPool.query(query, [id]);
+    let values = [id];
+    if (!isPrivilegedUser(req.user)) {
+      const scopedAccess = await buildHierarchyAccess({
+        req,
+        alias: "Products",
+        ownerColumns: ["CreatedBy"],
+        values,
+      });
+      values = scopedAccess.values;
+      if (scopedAccess.clause) {
+        query = query.replace('RETURNING *', `AND ${scopedAccess.clause.replaceAll('Products.', '')} RETURNING *`);
+      }
+    }
+
+    const result = await appPool.query(query, values);
 
     if (result.rows.length === 0) {
       return res.status(404).json({

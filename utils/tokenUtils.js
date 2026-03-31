@@ -8,6 +8,8 @@ const generateTokens = async (user) => {
     userId: user.UserId,
     email: user.Email,
     userTypeId: user.UserTypeId,
+    roleId: user.RoleId,
+    companyId: user.CompanyId,
   };
   const accessToken = jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRY,

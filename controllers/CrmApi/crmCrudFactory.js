@@ -1,8 +1,26 @@
 const { appPool } = require("../../config/db");
+const { buildHierarchyAccess } = require("../../utils/hierarchyAccess");
 
 const toInt = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
+};
+
+const getDatabaseErrorMessage = (error, tableName) => {
+  if (error.code === "23502") {
+    const column = error.column || "required field";
+    return `${column} is required to create ${tableName}`;
+  }
+
+  if (error.code === "23503") {
+    return `A related record was not found while saving ${tableName}`;
+  }
+
+  if (error.code === "23505") {
+    return `${tableName} already contains a record with the same value`;
+  }
+
+  return `Failed to create ${tableName} record`;
 };
 
 const buildSelectColumns = (config) => {
@@ -11,6 +29,40 @@ const buildSelectColumns = (config) => {
   }
 
   return `${config.alias || "t"}.*`;
+};
+
+const pickFieldValues = (fields, payload) => fields.map((field) => payload[field] ?? null);
+
+const fetchRecordById = async ({ client, tableName, alias, joins, selectColumns, idColumn, id }) => {
+  const query = `
+    SELECT ${selectColumns}
+    FROM "${tableName}" ${alias}
+    ${joins}
+    WHERE ${alias}."${idColumn}" = $1
+    LIMIT 1;
+  `;
+
+  const { rows } = await client.query(query, [id]);
+  return rows[0] || null;
+};
+
+const applyAuditFields = ({ payload, req, fields, isCreate }) => {
+  const nextPayload = { ...payload };
+  const userId = req.user?.userId ?? null;
+
+  if (fields.includes("CreatedBy")) {
+    if (isCreate) {
+      nextPayload.CreatedBy = userId;
+    } else if ("CreatedBy" in nextPayload) {
+      delete nextPayload.CreatedBy;
+    }
+  }
+
+  if (fields.includes("UpdatedBy")) {
+    nextPayload.UpdatedBy = userId;
+  }
+
+  return nextPayload;
 };
 
 const createCrudController = (config) => {
@@ -23,19 +75,34 @@ const createCrudController = (config) => {
   const defaultFilters = config.defaultFilters || [];
   const joins = config.joins || "";
   const selectColumns = buildSelectColumns(config);
+  const beforeCreate = config.beforeCreate;
+  const accessControl = config.accessControl || null;
 
   const list = async (req, res) => {
     const limit = toInt(req.query.limit, 25);
     const offset = toInt(req.query.offset, 0);
     const search = req.query.search?.trim();
     const conditions = [...defaultFilters];
-    const values = [];
+    let values = [];
 
     if (search && searchColumns.length) {
       const searchIndex = values.push(`%${search}%`);
       conditions.push(
         `(${searchColumns.map((column) => `${column} ILIKE $${searchIndex}`).join(" OR ")})`
       );
+    }
+
+    if (accessControl?.ownerColumns?.length) {
+      const scopedAccess = await buildHierarchyAccess({
+        req,
+        alias,
+        ownerColumns: accessControl.ownerColumns,
+        values,
+      });
+      values = scopedAccess.values;
+      if (scopedAccess.clause) {
+        conditions.push(scopedAccess.clause);
+      }
     }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -77,16 +144,36 @@ const createCrudController = (config) => {
   };
 
   const getById = async (req, res) => {
-    const query = `
-      SELECT ${selectColumns}
-      FROM "${tableName}" ${alias}
-      ${joins}
-      WHERE ${alias}."${idColumn}" = $1
-      LIMIT 1;
-    `;
-
     try {
-      const { rows } = await appPool.query(query, [req.params.id]);
+      let values = [req.params.id];
+      const conditions = [`${alias}."${idColumn}" = $1`];
+
+      if (defaultFilters.length) {
+        conditions.push(...defaultFilters);
+      }
+
+      if (accessControl?.ownerColumns?.length) {
+        const scopedAccess = await buildHierarchyAccess({
+          req,
+          alias,
+          ownerColumns: accessControl.ownerColumns,
+          values,
+        });
+        values = scopedAccess.values;
+        if (scopedAccess.clause) {
+          conditions.push(scopedAccess.clause);
+        }
+      }
+
+      const query = `
+        SELECT ${selectColumns}
+        FROM "${tableName}" ${alias}
+        ${joins}
+        WHERE ${conditions.join(" AND ")}
+        LIMIT 1;
+      `;
+
+      const { rows } = await appPool.query(query, values);
 
       if (!rows.length) {
         return res.status(404).json({ message: `${tableName} record not found` });
@@ -100,38 +187,93 @@ const createCrudController = (config) => {
   };
 
   const create = async (req, res) => {
-    const placeholders = fields.map((_, index) => `$${index + 1}`).join(", ");
-    const columns = fields.map((field) => `"${field}"`).join(", ");
-    const values = fields.map((field) => req.body[field] ?? null);
-
-    const query = `
-      INSERT INTO "${tableName}" (${columns})
-      VALUES (${placeholders})
-      RETURNING *;
-    `;
+    const client = await appPool.connect();
 
     try {
-      const { rows } = await appPool.query(query, values);
-      res.status(201).json(rows[0]);
+      await client.query("BEGIN");
+
+      const basePayload = applyAuditFields({
+        payload: req.body,
+        req,
+        fields,
+        isCreate: true,
+      });
+      const payload = beforeCreate
+        ? await beforeCreate({ payload: basePayload, req, client })
+        : basePayload;
+
+      const placeholders = fields.map((_, index) => `$${index + 1}`).join(", ");
+      const columns = fields.map((field) => `"${field}"`).join(", ");
+      const values = pickFieldValues(fields, payload);
+
+      const query = `
+        INSERT INTO "${tableName}" (${columns})
+        VALUES (${placeholders})
+        RETURNING "${idColumn}";
+      `;
+
+      const insertResult = await client.query(query, values);
+      const createdId = insertResult.rows[0]?.[idColumn];
+      const createdRecord = await fetchRecordById({
+        client,
+        tableName,
+        alias,
+        joins,
+        selectColumns,
+        idColumn,
+        id: createdId,
+      });
+
+      await client.query("COMMIT");
+      res.status(201).json(createdRecord);
     } catch (error) {
+      await client.query("ROLLBACK");
       console.error(`Error creating ${tableName}:`, error);
-      res.status(500).json({ message: `Failed to create ${tableName} record` });
+      res.status(400).json({ message: getDatabaseErrorMessage(error, tableName) });
+    } finally {
+      client.release();
     }
   };
 
   const update = async (req, res) => {
-    const setClause = fields.map((field, index) => `"${field}" = $${index + 1}`).join(", ");
-    const values = fields.map((field) => req.body[field] ?? null);
-    values.push(req.params.id);
+    const payload = applyAuditFields({
+      payload: req.body,
+      req,
+      fields,
+      isCreate: false,
+    });
+    const updateFields = fields.filter((field) => Object.prototype.hasOwnProperty.call(payload, field));
 
-    const query = `
-      UPDATE "${tableName}"
-      SET ${setClause}
-      WHERE "${idColumn}" = $${values.length}
-      RETURNING *;
-    `;
+    if (!updateFields.length) {
+      return res.status(400).json({ message: `No fields provided to update ${tableName}` });
+    }
 
     try {
+      const setClause = updateFields.map((field, index) => `"${field}" = $${index + 1}`).join(", ");
+      let values = updateFields.map((field) => payload[field] ?? null);
+      values.push(req.params.id);
+      const conditions = [`"${idColumn}" = $${values.length}`];
+
+      if (accessControl?.ownerColumns?.length) {
+        const scopedAccess = await buildHierarchyAccess({
+          req,
+          alias: tableName,
+          ownerColumns: accessControl.ownerColumns,
+          values,
+        });
+        values = scopedAccess.values;
+        if (scopedAccess.clause) {
+          conditions.push(scopedAccess.clause.replaceAll(`${tableName}.`, ""));
+        }
+      }
+
+      const query = `
+        UPDATE "${tableName}"
+        SET ${setClause}
+        WHERE ${conditions.join(" AND ")}
+        RETURNING *;
+      `;
+
       const { rows } = await appPool.query(query, values);
 
       if (!rows.length) {
@@ -141,15 +283,32 @@ const createCrudController = (config) => {
       res.json(rows[0]);
     } catch (error) {
       console.error(`Error updating ${tableName}:`, error);
-      res.status(500).json({ message: `Failed to update ${tableName} record` });
+      res.status(400).json({ message: error.code === "23503"
+        ? `A related record was not found while updating ${tableName}`
+        : `Failed to update ${tableName} record` });
     }
   };
 
   const remove = async (req, res) => {
-    const query = `DELETE FROM "${tableName}" WHERE "${idColumn}" = $1 RETURNING *;`;
-
     try {
-      const { rows } = await appPool.query(query, [req.params.id]);
+      let values = [req.params.id];
+      const conditions = [`"${idColumn}" = $1`];
+
+      if (accessControl?.ownerColumns?.length) {
+        const scopedAccess = await buildHierarchyAccess({
+          req,
+          alias: tableName,
+          ownerColumns: accessControl.ownerColumns,
+          values,
+        });
+        values = scopedAccess.values;
+        if (scopedAccess.clause) {
+          conditions.push(scopedAccess.clause.replaceAll(`${tableName}.`, ""));
+        }
+      }
+
+      const query = `DELETE FROM "${tableName}" WHERE ${conditions.join(" AND ")} RETURNING *;`;
+      const { rows } = await appPool.query(query, values);
 
       if (!rows.length) {
         return res.status(404).json({ message: `${tableName} record not found` });

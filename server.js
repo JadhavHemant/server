@@ -6,6 +6,7 @@ const { ensureDatabaseExists, appPool } = require('./config/db');
 const { initModels } = require('./Models/initModels');
 const companiesRoutes = require('./routes/Company/companiesRoutes');
 const userTypeRoutes = require('./routes/User/userTypeRoutes');
+const roleRoutes = require('./routes/User/roleRoutes');
 const userRoutes = require('./routes/User/userRoutes');
 const productCategoryRoutes =require('./routes/Inventory/productCategory/productCategory')
 const UnitRoutes = require('./routes/Inventory/units/units');
@@ -50,11 +51,13 @@ app.use(cors({
   origin: process.env.CLIENT_ORIGIN || true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/company', companiesRoutes);
 app.use('/api/usertypes', userTypeRoutes);
+app.use('/api/roles', roleRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/token', refreshToken);
 app.use('/api/productcategory',productCategoryRoutes)

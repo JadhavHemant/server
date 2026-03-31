@@ -1,7 +1,10 @@
 const express = require("express");
+const { verifyAccessToken } = require("../../middlewares/authMiddleware");
 
 const createCrudRouter = (controller) => {
   const router = express.Router();
+
+  router.use(verifyAccessToken);
 
   router.get("/", controller.list);
   router.get("/:id", controller.getById);

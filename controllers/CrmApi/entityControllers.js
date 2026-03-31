@@ -1,4 +1,5 @@
 const { createCrudController } = require("./crmCrudFactory");
+const { withAutoCreatedParties } = require("./crmAutoCreate");
 
 const accountController = createCrudController({
   tableName: "Accounts",
@@ -18,6 +19,7 @@ const accountController = createCrudController({
   joins: 'LEFT JOIN "Industries" i ON i."Id" = a."IndustryId"',
   selectColumns: ['a.*', 'i."Name" AS "IndustryName"'],
   defaultFilters: ['a."IsDeleted" = FALSE'],
+  accessControl: { ownerColumns: ["CreatedBy"] },
 });
 
 const contactController = createCrudController({
@@ -43,6 +45,7 @@ const contactController = createCrudController({
   joins: 'LEFT JOIN "Accounts" a ON a."Id" = c."AccountId"',
   selectColumns: ['c.*', 'a."Name" AS "AccountName"'],
   defaultFilters: ['c."IsDeleted" = FALSE'],
+  accessControl: { ownerColumns: ["CreatedBy"] },
 });
 
 const leadController = createCrudController({
@@ -78,6 +81,13 @@ const leadController = createCrudController({
     `TRIM(COALESCE(co."FirstName", '') || ' ' || COALESCE(co."LastName", '')) AS "ContactName"`,
   ],
   defaultFilters: ['l."IsDeleted" = FALSE'],
+  accessControl: { ownerColumns: ["CreatedBy", "AssignedTo", "AssignedFrom"] },
+  beforeCreate: ({ payload, client }) =>
+    withAutoCreatedParties({
+      payload,
+      client,
+      fallbackAccountName: payload.AutoAccountName || payload.AutoContactName,
+    }),
 });
 
 const opportunityController = createCrudController({
@@ -107,10 +117,23 @@ const opportunityController = createCrudController({
   alias: "o",
   joins: `
     LEFT JOIN "Accounts" a ON a."Id" = o."AccountId"
+    LEFT JOIN "Contacts" c ON c."Id" = o."ContactId"
     LEFT JOIN "SalesStages" s ON s."Id" = o."SalesStageId"
   `,
-  selectColumns: ['o.*', 'a."Name" AS "AccountName"', 's."Name" AS "SalesStageName"'],
+  selectColumns: [
+    'o.*',
+    'a."Name" AS "AccountName"',
+    `TRIM(COALESCE(c."FirstName", '') || ' ' || COALESCE(c."LastName", '')) AS "ContactName"`,
+    's."Name" AS "SalesStageName"',
+  ],
   defaultFilters: ['o."IsDeleted" = FALSE'],
+  accessControl: { ownerColumns: ["CreatedBy", "AssignedTo", "AssignedFrom"] },
+  beforeCreate: ({ payload, client }) =>
+    withAutoCreatedParties({
+      payload,
+      client,
+      fallbackAccountName: payload.AutoAccountName || payload.OpportunityName,
+    }),
 });
 
 const presalesController = createCrudController({
@@ -145,6 +168,7 @@ const presalesController = createCrudController({
   joins: 'LEFT JOIN "TaskTypes" tt ON tt."Id" = p."TaskTypeId"',
   selectColumns: ['p.*', 'tt."Name" AS "TaskTypeName"'],
   defaultFilters: ['p."IsDeleted" = FALSE'],
+  accessControl: { ownerColumns: ["CreatedBy", "AssignedTo", "AssignedFrom"] },
 });
 
 const caseController = createCrudController({
@@ -170,6 +194,7 @@ const caseController = createCrudController({
   searchColumns: ['cs."Subject"', 'cs."Status"', 'cs."Priority"'],
   alias: "cs",
   defaultFilters: ['cs."IsDeleted" = FALSE'],
+  accessControl: { ownerColumns: ["CreatedBy", "AssignedTo", "AssignedFrom"] },
 });
 
 module.exports = {

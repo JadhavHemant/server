@@ -12,32 +12,33 @@ const {
     getPurchaseOrdersBySupplier,
     getPurchaseOrderStats
 } = require("../../../controllers/InventoryApis/purchaseOrders");
+const { verifyAccessToken } = require("../../../middlewares/authMiddleware");
 
 // Get Purchase Order Statistics
-router.get("/stats", getPurchaseOrderStats);
+router.get("/stats", verifyAccessToken, getPurchaseOrderStats);
 
 // Get Purchase Orders by Supplier
-router.get("/supplier/:supplierId", getPurchaseOrdersBySupplier);
+router.get("/supplier/:supplierId", verifyAccessToken, getPurchaseOrdersBySupplier);
 
 // Get All Purchase Orders (with pagination & filters)
-router.get("/", getAllPurchaseOrders);
+router.get("/", verifyAccessToken, getAllPurchaseOrders);
 
 // Get Purchase Order by Id
-router.get("/:id", getPurchaseOrderById);
+router.get("/:id", verifyAccessToken, getPurchaseOrderById);
 
 // Create Purchase Order
-router.post("/", createPurchaseOrder);
+router.post("/", verifyAccessToken, createPurchaseOrder);
 
 // Update Purchase Order by Id
-router.put("/:id", updatePurchaseOrder);
+router.put("/:id", verifyAccessToken, updatePurchaseOrder);
 
 // Update Purchase Order Status
-router.patch("/:id/status", updatePurchaseOrderStatus);
+router.patch("/:id/status", verifyAccessToken, updatePurchaseOrderStatus);
 
 // Soft Delete Purchase Order by Id (Cancel)
-router.patch("/soft-delete/:id", softDeletePurchaseOrder);
+router.patch("/soft-delete/:id", verifyAccessToken, softDeletePurchaseOrder);
 
 // Hard Delete Purchase Order by Id
-router.delete("/hard-delete/:id", hardDeletePurchaseOrder);
+router.delete("/hard-delete/:id", verifyAccessToken, hardDeletePurchaseOrder);
 
 module.exports = router;
